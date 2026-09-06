@@ -43,7 +43,7 @@ namespace GUI {
   static const std::vector<std::string> filament_vendors = 
     {"3Dgenius",               "3DJake",                 "3DXTECH",                "3D BEST-Q",              "3D Hero",
      "3D-Fuel",                "Aceaddity",              "AddNorth",               "Amazon Basics",          "AMOLEN",
-     "Ankermake",              "Anycubic",               "Atomic",                 "AzureFilm",              "BASF",
+     "Ambrosia",               "Ankermake",              "Anycubic",               "Atomic",                 "AzureFilm",              "BASF",
      "Bblife",                 "BCN3D",                  "Beyond Plastic",         "California Filament",    "Capricorn",
      "CC3D",                   "colorFabb",              "Comgrow",                "Cookiecad",              "Creality",
      "CERPRiSE",               "Das Filament",           "DO3D",                   "DOW",                    "DREMC",
