@@ -991,6 +991,7 @@ wxBoxSizer *CreateFilamentPresetDialog::create_filament_preset_item()
         std::vector<std::pair<std::string, Preset *>> printer_name_to_filament_preset;
         if (iter != m_filament_choice_map.end()) {
             std::unordered_map<std::string, float> nozzle_diameter = nozzle_diameter_map;
+            std::set<std::string>                  added_printer_names;
             for (Preset* preset : iter->second) {
                 auto compatible_printers = preset->config.option<ConfigOptionStrings>("compatible_printers", true);
                 if (!compatible_printers || compatible_printers->values.empty()) {
@@ -1001,6 +1002,10 @@ wxBoxSizer *CreateFilamentPresetDialog::create_filament_preset_item()
                         if (nozzle_diameter[nozzle] == 0) {
                             BOOST_LOG_TRIVIAL(info)
                                 << __FUNCTION__ << " compatible printer nozzle encounter exception and name is: " << visible_printer;
+                            continue;
+                        }
+                        if (!added_printer_names.insert(visible_printer).second) {
+                            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " skip duplicate compatible printer name: " << visible_printer;
                             continue;
                         }
                         // Add to the list of available printer-preset pairs
@@ -1020,6 +1025,10 @@ wxBoxSizer *CreateFilamentPresetDialog::create_filament_preset_item()
                     std::string nozzle = get_printer_nozzle_diameter(compatible_printer_name);
                     if (nozzle_diameter[nozzle] == 0) {
                         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " compatible printer nozzle encounter exception and name is: " << compatible_printer_name;
+                        continue;
+                    }
+                    if (!added_printer_names.insert(compatible_printer_name).second) {
+                        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " skip duplicate compatible printer name: " << compatible_printer_name;
                         continue;
                     }
                     printer_name_to_filament_preset.push_back(std::make_pair(compatible_printer_name,preset));
