@@ -866,22 +866,23 @@ wxBoxSizer *CreateFilamentPresetDialog::create_type_item()
     optionSizer->SetMinSize(OPTION_SIZE);
     horizontal_sizer->Add(optionSizer, 0, wxEXPAND | wxALL, FromDIP(5));
 
-    wxArrayString filament_type;
-    for (const wxString filament : m_system_filament_types_set) {
-        filament_type.Add(filament);
-    }
-    filament_type.Sort();
-
     wxBoxSizer *comboBoxSizer = new wxBoxSizer(wxVERTICAL);
-    m_filament_type_combobox  = new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, NAME_OPTION_COMBOBOX_SIZE, 0, nullptr, wxCB_READONLY);
-    m_filament_type_combobox->SetLabel(_L("Select Type"));
-    m_filament_type_combobox->SetLabelColor(DEFAULT_PROMPT_TEXT_COLOUR);
-    m_filament_type_combobox->Set(filament_type);
-    comboBoxSizer->Add(m_filament_type_combobox, 0, wxEXPAND | wxALL, 0);
+    m_filament_type_input     = new TextInput(this, "", "", "", wxDefaultPosition, NAME_OPTION_COMBOBOX_SIZE, wxTE_PROCESS_ENTER);
+    m_filament_type_input->GetTextCtrl()->SetMaxLength(50);
+    m_filament_type_input->GetTextCtrl()->SetHint(_L("Enter Type"));
+    comboBoxSizer->Add(m_filament_type_input, 0, wxEXPAND | wxALL, 0);
     horizontal_sizer->Add(comboBoxSizer, 0, wxEXPAND | wxALL, FromDIP(5));
 
-    m_filament_type_combobox->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent &e) {
-        m_filament_type_combobox->SetLabelColor(*wxBLACK);
+    m_filament_type_input->GetTextCtrl()->Bind(wxEVT_CHAR, [](wxKeyEvent &event) {
+        int key = event.GetKeyCode();
+        if (cannot_input_key.find(key) != cannot_input_key.end()) {
+            event.Skip(false);
+            return;
+        }
+        event.Skip();
+        });
+
+    m_filament_type_input->GetTextCtrl()->Bind(wxEVT_TEXT, [this](wxCommandEvent &e) {
         const wxString &curr_create_type = curr_create_filament_type();
         clear_filament_preset_map();
         if (curr_create_type == m_create_type.base_filament) {
@@ -1076,10 +1077,10 @@ wxWindow *CreateFilamentPresetDialog::create_dialog_buttons()
         }
 
         //get fialment type name
-        wxString type_str = m_filament_type_combobox->GetLabel();
+        wxString type_str = filament_type_value();
         std::string type_name;
-        if (_L("Select Type") == type_str) {
-            MessageDialog dlg(this, _L("Filament type is not selected, please reselect type."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
+        if (type_str.empty()) {
+            MessageDialog dlg(this, _L("Filament type missing; please input type."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
             dlg.ShowModal();
             return;
         } else {
@@ -1097,18 +1098,20 @@ wxWindow *CreateFilamentPresetDialog::create_dialog_buttons()
             serial_name = into_u8(serial_str);
         }
         vendor_name = remove_special_key(vendor_name);
+        type_name   = remove_special_key(type_name);
         serial_name = remove_special_key(serial_name);
 
-        if (vendor_name.empty() || serial_name.empty()) {
-            MessageDialog dlg(this, _L("There may be disallowed characters in the vendor or serial input of the filament. Please delete and re-enter."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
+        if (vendor_name.empty() || type_name.empty() || serial_name.empty()) {
+            MessageDialog dlg(this, _L("There may be disallowed characters in the vendor, type, or serial input of the filament. Please delete and re-enter."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"),
                               wxYES | wxYES_DEFAULT | wxCENTRE);
             dlg.ShowModal();
             return;
         }
         boost::algorithm::trim(vendor_name);
+        boost::algorithm::trim(type_name);
         boost::algorithm::trim(serial_name);
-        if (vendor_name.empty() || serial_name.empty()) {
-            MessageDialog dlg(this, _L("All inputs in the custom vendor or serial are spaces. Please re-enter."),
+        if (vendor_name.empty() || type_name.empty() || serial_name.empty()) {
+            MessageDialog dlg(this, _L("All inputs in the custom vendor, type, or serial are spaces. Please re-enter."),
                               wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
             dlg.ShowModal();
             return;
@@ -1212,9 +1215,9 @@ wxArrayString CreateFilamentPresetDialog::get_filament_preset_choices()
 {
     wxArrayString choices;
     // get fialment type name
-    wxString    type_str = m_filament_type_combobox->GetLabel();
+    wxString    type_str = filament_type_value();
     std::string type_name;
-    if (_L("Select Type") == type_str) {
+    if (type_str.empty()) {
         /*MessageDialog dlg(this, _L("Filament type is not selected, please reselect type."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT | wxCENTRE);
         dlg.ShowModal();*/
         return choices;
@@ -1300,7 +1303,7 @@ void CreateFilamentPresetDialog::select_curr_radiobox(std::vector<std::pair<Radi
             if (curr_selected_type == m_create_type.base_filament) {
                 m_filament_preset_text->SetLabel(_L("We could create the filament presets for your following printer:"));
                 m_filament_preset_combobox->Show();
-                if (_L("Select Type") != m_filament_type_combobox->GetLabel()) {
+                if (!filament_type_value().empty()) {
                     clear_filament_preset_map();
                     wxArrayString filament_preset_choice = get_filament_preset_choices();
                     m_filament_preset_combobox->Set(filament_preset_choice);
@@ -1311,7 +1314,7 @@ void CreateFilamentPresetDialog::select_curr_radiobox(std::vector<std::pair<Radi
                 m_filament_preset_text->SetLabel(_L("We would rename the presets as \"Vendor Type Serial @printer you selected\".\n"
                                                     "To add preset for more printers, please go to printer selection"));
                 m_filament_preset_combobox->Hide();
-                if (_L("Select Type") != m_filament_type_combobox->GetLabel()) {
+                if (!filament_type_value().empty()) {
 
                     clear_filament_preset_map();
                     get_filament_presets_by_machine();
@@ -1338,13 +1341,21 @@ wxString CreateFilamentPresetDialog::curr_create_filament_type()
     return curr_filament_type;
 }
 
+wxString CreateFilamentPresetDialog::filament_type_value() const
+{
+    wxString type_str = m_filament_type_input ? m_filament_type_input->GetTextCtrl()->GetValue() : wxEmptyString;
+    type_str.Trim(true);
+    type_str.Trim(false);
+    return type_str;
+}
+
 void CreateFilamentPresetDialog::get_filament_presets_by_machine()
 {
     wxArrayString choices;
     // get fialment type name
-    wxString    type_str = m_filament_type_combobox->GetLabel();
+    wxString    type_str = filament_type_value();
     std::string type_name;
-    if (_L("Select Type") == type_str) {
+    if (type_str.empty()) {
         /*MessageDialog dlg(this, _L("Filament type is not selected, please reselect type."), wxString(SLIC3R_APP_FULL_NAME) + " - " + _L("Info"), wxYES | wxYES_DEFAULT |
         wxCENTRE); dlg.ShowModal();*/
         return;

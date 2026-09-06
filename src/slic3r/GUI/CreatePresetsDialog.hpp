@@ -50,6 +50,7 @@ private:
     wxBoxSizer *  create_radio_item(wxString title, wxWindow *parent, wxString tooltip, std::vector<std::pair<RadioBox *, wxString>> &radiobox_list);
     void          select_curr_radiobox(std::vector<std::pair<RadioBox *, wxString>> &radiobox_list, int btn_idx);
     wxString      curr_create_filament_type();
+    wxString      filament_type_value() const;
     void          get_filament_presets_by_machine();
     void          get_all_filament_presets();
     void          get_all_visible_printer_name();
@@ -77,7 +78,7 @@ private:
     Button *                                                         m_button_cancel                = nullptr;
     ComboBox *                                                       m_filament_vendor_combobox     = nullptr;
     ::CheckBox *                                                     m_can_not_find_vendor_checkbox = nullptr;
-    ComboBox *                                                       m_filament_type_combobox       = nullptr;
+    TextInput *                                                      m_filament_type_input          = nullptr;
     ComboBox *                                                       m_filament_preset_combobox     = nullptr;
     TextInput *                                                      m_filament_custom_vendor_input = nullptr;
     wxGridSizer *                                                    m_filament_presets_sizer       = nullptr;
