@@ -58,6 +58,7 @@ class OG_CustomCtrl :public wxPanel
         void    correct_items_positions();
         void    msw_rescale();
         void    update_visibility(ConfigOptionMode mode);
+        void    show_controls(bool show);
 
         void render_separator(wxDC& dc, wxCoord v_pos);
 
@@ -76,6 +77,8 @@ class OG_CustomCtrl :public wxPanel
     };
 
     std::vector<CtrlLine> ctrl_lines;
+    bool                  m_collapsed{ false };
+    ConfigOptionMode      m_last_mode{ comExpert };
 
 public:
     OG_CustomCtrl(  wxWindow* parent,
@@ -93,6 +96,7 @@ public:
 
     void    init_ctrl_lines();
     bool    update_visibility(ConfigOptionMode mode);
+    void    set_collapsed(bool collapsed);
     void    correct_window_position(wxWindow* win, const Line& line, Field* field = nullptr);
     void    correct_widgets_position(wxSizer* widget, const Line& line, Field* field = nullptr);
     void    init_max_win_width();

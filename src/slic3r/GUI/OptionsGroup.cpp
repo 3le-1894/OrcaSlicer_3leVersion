@@ -212,6 +212,8 @@ void OptionsGroup::apply_collapsed_state()
     const bool show_content = !m_collapsed;
     if (m_content_spacer)
         m_content_spacer->Show(show_content);
+    if (custom_ctrl)
+        custom_ctrl->set_collapsed(m_collapsed);
     show_sizer_items_recursive(m_grid_sizer, show_content);
     sizer->Show(m_grid_sizer, show_content, false);
 

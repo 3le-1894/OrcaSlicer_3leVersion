@@ -487,6 +487,8 @@ void OG_CustomCtrl::OnLeaveWin(wxMouseEvent& event)
 
 bool OG_CustomCtrl::update_visibility(ConfigOptionMode mode)
 {
+    m_last_mode = mode;
+
     // BBS: new layout
     wxCoord    h_pos = (ctrlWidth + get_title_width() - titleWidth) * m_em_unit;
     wxCoord    h_pos2 = get_title_width() * m_em_unit;
@@ -495,6 +497,12 @@ bool OG_CustomCtrl::update_visibility(ConfigOptionMode mode)
     bool has_visible_lines = false;
     for (CtrlLine& line : ctrl_lines) {
         line.update_visibility(mode);
+        if (m_collapsed) {
+            if (line.is_visible && !line.is_separator())
+                has_visible_lines = true;
+            line.is_visible = false;
+            line.show_controls(false);
+        }
         if (line.is_visible) {
             v_pos += (wxCoord)line.height;
 
@@ -517,6 +525,17 @@ bool OG_CustomCtrl::update_visibility(ConfigOptionMode mode)
     this->SetMinSize(wxSize(h_pos, v_pos));
 
     return has_visible_lines;
+}
+
+void OG_CustomCtrl::set_collapsed(bool collapsed)
+{
+    if (m_collapsed == collapsed)
+        return;
+
+    m_collapsed = collapsed;
+    update_visibility(m_last_mode);
+    Layout();
+    Refresh();
 }
 
 // BBS: call by Tab/Page
@@ -724,12 +743,24 @@ void OG_CustomCtrl::CtrlLine::update_visibility(ConfigOptionMode mode)
     if (draw_just_act_buttons)
         return;
 
+    show_controls(is_visible);
+    if (is_visible)
+        correct_items_positions();
+}
+
+void OG_CustomCtrl::CtrlLine::show_controls(bool show)
+{
+    if (draw_just_act_buttons)
+        return;
+
+    const std::vector<Option>& option_set = og_line.get_options();
+
     if (og_line.near_label_widget_win)
-        og_line.near_label_widget_win->Show(is_visible);
+        og_line.near_label_widget_win->Show(show);
     if (og_line.widget_sizer)
-        og_line.widget_sizer->ShowItems(is_visible);
+        og_line.widget_sizer->ShowItems(show);
     if (og_line.extra_widget_sizer)
-        og_line.extra_widget_sizer->ShowItems(is_visible);
+        og_line.extra_widget_sizer->ShowItems(show);
 
     for (auto opt : option_set) {
         Field* field = ctrl->opt_group->get_field(opt.opt_id);
@@ -740,13 +771,11 @@ void OG_CustomCtrl::CtrlLine::update_visibility(ConfigOptionMode mode)
             auto children = field->getSizer()->GetChildren();
             for (auto child : children)
                 if (child->IsWindow())
-                    child->GetWindow()->Show(is_visible);
+                    child->GetWindow()->Show(show);
         }
         else if (field->getWindow())
-            field->getWindow()->Show(is_visible);
+            field->getWindow()->Show(show);
     }
-
-    correct_items_positions();
 }
 
 void OG_CustomCtrl::CtrlLine::render_separator(wxDC& dc, wxCoord v_pos)
