@@ -3,6 +3,7 @@
 
 #include <wx/stattext.h>
 #include <wx/settings.h>
+#include <wx/sizer.h>
 
 #include <map>
 #include <functional>
@@ -150,6 +151,8 @@ public:
 	void		append_line(const Line& line);
 	// create controls for the option group
 	void		activate_line(Line& line);
+    void        toggle_collapse();
+    void        set_collapsed(bool collapsed);
 	//BBS: get line for opt_key
 	Line* get_line(const std::string& opt_key);
 
@@ -223,8 +226,10 @@ protected:
     /// using types that need to know what it is beyond the public interface
     /// need to cast based on the related ConfigOptionDef.
     t_optionfield_map		m_fields;
-    bool					m_disabled {false};
+	bool					m_disabled {false};
+    bool                    m_collapsed {false};
     wxGridSizer*			m_grid_sizer {nullptr};
+    wxSizerItem*            m_content_spacer {nullptr};
 	// "true" if option is created in preset tabs
 	bool					m_use_custom_ctrl{ false };
 
@@ -256,6 +261,7 @@ public:
 
 protected:
     std::string         pick_plugin(const ConfigOptionDef& opt);
+    void                apply_collapsed_state();
 };
 
 class ConfigOptionsGroup: public OptionsGroup {

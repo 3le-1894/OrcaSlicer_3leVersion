@@ -15,6 +15,7 @@
 #include <slic3r/plugin/PythonPluginInterface.hpp>
 #include <utility>
 #include <wx/bookctrl.h>
+#include <wx/cursor.h>
 #include <wx/numformatter.h>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
@@ -172,6 +173,39 @@ void OptionsGroup::set_max_win_width(int max_win_width)
 {
     if (custom_ctrl)
         custom_ctrl->set_max_win_width(max_win_width);
+}
+
+void OptionsGroup::toggle_collapse()
+{
+    set_collapsed(!m_collapsed);
+}
+
+void OptionsGroup::set_collapsed(bool collapsed)
+{
+    if (m_collapsed == collapsed)
+        return;
+
+    m_collapsed = collapsed;
+    apply_collapsed_state();
+}
+
+void OptionsGroup::apply_collapsed_state()
+{
+    if (!sizer || !m_grid_sizer || staticbox || title.IsEmpty())
+        return;
+
+    const bool show_content = !m_collapsed;
+    if (m_content_spacer)
+        m_content_spacer->Show(show_content);
+    m_grid_sizer->ShowItems(show_content);
+    sizer->Show(m_grid_sizer, show_content, false);
+
+    if (stb)
+        stb->SetCursor(wxCursor(wxCURSOR_HAND));
+    if (m_parent) {
+        m_parent->Layout();
+        m_parent->Refresh();
+    }
 }
 
 void OptionsGroup::remove_option_if(std::function<bool(std::string const&)> const& comp)
@@ -519,7 +553,12 @@ bool OptionsGroup::activate(std::function<void()> throw_if_canceled /* = [](){}*
                 stl->Hide();
             } else {
                 sizer->Add(stl, 0, wxEXPAND);
-                sizer->AddSpacer(8);
+                m_content_spacer = sizer->AddSpacer(8);
+                stl->SetCursor(wxCursor(wxCURSOR_HAND));
+                stl->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) {
+                    toggle_collapse();
+                    event.Skip();
+                });
             }
             this->stb = stl;
         }
@@ -552,6 +591,7 @@ bool OptionsGroup::activate(std::function<void()> throw_if_canceled /* = [](){}*
         ctrl_horiz_alignment = horiz_alignment;
         if (custom_ctrl)
             custom_ctrl->init_max_win_width();
+        apply_collapsed_state();
     } catch (UIBuildCanceled&) {
         auto p = sizer;
         this->clear();
@@ -572,6 +612,7 @@ void OptionsGroup::clear(bool destroy_custom_ctrl)
         return;
 
     m_grid_sizer = nullptr;
+    m_content_spacer = nullptr;
     sizer        = nullptr;
     stb          = nullptr; // BBS: fix pointer
 
@@ -852,6 +893,8 @@ void ConfigOptionsGroup::Hide() { Show(false); }
 void ConfigOptionsGroup::Show(const bool show)
 {
     sizer->ShowItems(show);
+    if (show)
+        apply_collapsed_state();
 #if 0  // #ifdef __WXGTK__
     m_panel->Show(show);
     m_grid_sizer->Show(show);
@@ -913,6 +956,7 @@ bool ConfigOptionsGroup::update_visibility(ConfigOptionMode mode)
         sizer->ShowItems(false);
         return false;
     }
+    apply_collapsed_state();
     return true;
 }
 

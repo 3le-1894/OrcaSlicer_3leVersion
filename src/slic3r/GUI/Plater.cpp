@@ -13340,8 +13340,8 @@ void Plater::priv::set_project_name(const wxString& project_name)
     if (!m_project_name.IsEmpty())
         wxGetApp().mainframe->update_title_colour_after_set_title();
 #else
-    wxGetApp().mainframe->SetTitle(m_project_name + " - OrcaSlicer");
-    wxGetApp().mainframe->topbar()->SetTitle(m_project_name);
+    wxGetApp().mainframe->SetTitle(m_project_name + " - OrcaSlicer 3le Version");
+    wxGetApp().mainframe->topbar()->SetTitle(m_project_name + " - OrcaSlicer 3le Version");
 #endif
 }
 
@@ -13360,8 +13360,8 @@ void Plater::priv::update_title_dirty_status()
     wxGetApp().mainframe->SetTitle(title);
     wxGetApp().mainframe->update_title_colour_after_set_title();
 #else
-    wxGetApp().mainframe->SetTitle(title + " - OrcaSlicer");
-    wxGetApp().mainframe->topbar()->SetTitle(title);
+    wxGetApp().mainframe->SetTitle(title + " - OrcaSlicer 3le Version");
+    wxGetApp().mainframe->topbar()->SetTitle(title + " - OrcaSlicer 3le Version");
 #endif    
 }
 
