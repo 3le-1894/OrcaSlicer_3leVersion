@@ -68,6 +68,25 @@ static const std::vector<std::string> filament_types = {"PLA",    "rPLA",  "PLA+
                                                         "PETGCF", "PTBA",  "PTBA90A",   "PEEK",  "TPU93A", "TPU75D", "TPU",       "TPU92A", "TPU98A", "Misc",
                                                         "TPE",    "GLAZE", "Nylon",     "CPE",   "METAL",  "ABST",   "Carbon Fiber", "SBS"};
 
+static const std::unordered_map<std::string, std::string> custom_filament_type_base_types = {
+    {"ABS-CF",  "ABS"},
+    {"ABS-GF",  "ABS"},
+    {"ASA-CF",  "ASA"},
+    {"ASA-GF",  "ASA"},
+    {"PA-CF",   "PA"},
+    {"PA-GF",   "PA"},
+    {"PC-CF",   "PC"},
+    {"PC-GF",   "PC"},
+    {"PET-CF",  "PET"},
+    {"PET-GF",  "PET"},
+    {"PETG-CF", "PETG"},
+    {"PETG-GF", "PETG"},
+    {"PLA-CF",  "PLA"},
+    {"PLA-GF",  "PLA"},
+    {"TPU-CF",  "TPU"},
+    {"TPU-GF",  "TPU"},
+};
+
 static const std::vector<std::string> printer_vendors = 
     {"Anker",              "Anycubic",           "Artillery",          "Bambulab",           "BIQU",
      "Blocks",             "Chuanying",          "Co Print",           "Comgrow",            "CONSTRUCT3D",
@@ -866,23 +885,25 @@ wxBoxSizer *CreateFilamentPresetDialog::create_type_item()
     optionSizer->SetMinSize(OPTION_SIZE);
     horizontal_sizer->Add(optionSizer, 0, wxEXPAND | wxALL, FromDIP(5));
 
+    wxArrayString filament_type;
+    for (const wxString filament : m_system_filament_types_set) {
+        filament_type.Add(filament);
+    }
+    for (const auto &custom_type : custom_filament_type_base_types) {
+        filament_type.Add(from_u8(custom_type.first));
+    }
+    filament_type.Sort();
+
     wxBoxSizer *comboBoxSizer = new wxBoxSizer(wxVERTICAL);
-    m_filament_type_input     = new TextInput(this, "", "", "", wxDefaultPosition, NAME_OPTION_COMBOBOX_SIZE, wxTE_PROCESS_ENTER);
-    m_filament_type_input->GetTextCtrl()->SetMaxLength(50);
-    m_filament_type_input->GetTextCtrl()->SetHint(_L("Enter Type"));
-    comboBoxSizer->Add(m_filament_type_input, 0, wxEXPAND | wxALL, 0);
+    m_filament_type_combobox  = new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, NAME_OPTION_COMBOBOX_SIZE, 0, nullptr, wxCB_READONLY);
+    m_filament_type_combobox->SetLabel(_L("Select Type"));
+    m_filament_type_combobox->SetLabelColor(DEFAULT_PROMPT_TEXT_COLOUR);
+    m_filament_type_combobox->Set(filament_type);
+    comboBoxSizer->Add(m_filament_type_combobox, 0, wxEXPAND | wxALL, 0);
     horizontal_sizer->Add(comboBoxSizer, 0, wxEXPAND | wxALL, FromDIP(5));
 
-    m_filament_type_input->GetTextCtrl()->Bind(wxEVT_CHAR, [](wxKeyEvent &event) {
-        int key = event.GetKeyCode();
-        if (cannot_input_key.find(key) != cannot_input_key.end()) {
-            event.Skip(false);
-            return;
-        }
-        event.Skip();
-        });
-
-    m_filament_type_input->GetTextCtrl()->Bind(wxEVT_TEXT, [this](wxCommandEvent &e) {
+    m_filament_type_combobox->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent &e) {
+        m_filament_type_combobox->SetLabelColor(*wxBLACK);
         const wxString &curr_create_type = curr_create_filament_type();
         clear_filament_preset_map();
         if (curr_create_type == m_create_type.base_filament) {
@@ -1222,7 +1243,7 @@ wxArrayString CreateFilamentPresetDialog::get_filament_preset_choices()
         dlg.ShowModal();*/
         return choices;
     } else {
-        type_name = into_u8(type_str);
+        type_name = filament_type_base_value();
     }
 
     for (std::pair<std::string, Preset*> filament_presets : m_all_presets_map) {
@@ -1343,10 +1364,23 @@ wxString CreateFilamentPresetDialog::curr_create_filament_type()
 
 wxString CreateFilamentPresetDialog::filament_type_value() const
 {
-    wxString type_str = m_filament_type_input ? m_filament_type_input->GetTextCtrl()->GetValue() : wxEmptyString;
+    wxString type_str = m_filament_type_combobox ? m_filament_type_combobox->GetLabel() : wxEmptyString;
+    if (_L("Select Type") == type_str) {
+        return wxEmptyString;
+    }
     type_str.Trim(true);
     type_str.Trim(false);
     return type_str;
+}
+
+std::string CreateFilamentPresetDialog::filament_type_base_value() const
+{
+    std::string type_name = into_u8(filament_type_value());
+    auto        type_it   = custom_filament_type_base_types.find(type_name);
+    if (type_it != custom_filament_type_base_types.end()) {
+        return type_it->second;
+    }
+    return type_name;
 }
 
 void CreateFilamentPresetDialog::get_filament_presets_by_machine()
@@ -1360,7 +1394,7 @@ void CreateFilamentPresetDialog::get_filament_presets_by_machine()
         wxCENTRE); dlg.ShowModal();*/
         return;
     } else {
-        type_name = into_u8(type_str);
+        type_name = filament_type_base_value();
     }
 
     std::unordered_map<std::string, float>                 nozzle_diameter = nozzle_diameter_map;
