@@ -885,12 +885,17 @@ wxBoxSizer *CreateFilamentPresetDialog::create_type_item()
     optionSizer->SetMinSize(OPTION_SIZE);
     horizontal_sizer->Add(optionSizer, 0, wxEXPAND | wxALL, FromDIP(5));
 
-    wxArrayString filament_type;
+    std::set<wxString> filament_type_set;
     for (const wxString filament : m_system_filament_types_set) {
-        filament_type.Add(filament);
+        filament_type_set.insert(filament);
     }
     for (const auto &custom_type : custom_filament_type_base_types) {
-        filament_type.Add(from_u8(custom_type.first));
+        filament_type_set.insert(from_u8(custom_type.first));
+    }
+
+    wxArrayString filament_type;
+    for (const wxString &filament : filament_type_set) {
+        filament_type.Add(filament);
     }
     filament_type.Sort();
 
