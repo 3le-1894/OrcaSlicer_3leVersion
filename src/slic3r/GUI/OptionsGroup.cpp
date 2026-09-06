@@ -17,6 +17,7 @@
 #include <wx/bookctrl.h>
 #include <wx/cursor.h>
 #include <wx/numformatter.h>
+#include <wx/scrolwin.h>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include "libslic3r/Exception.hpp"
@@ -31,6 +32,20 @@ namespace Slic3r { namespace GUI {
 
 // BBS: new layout
 constexpr int titleWidth = 20;
+
+static void show_sizer_items_recursive(wxSizer* sizer, bool show)
+{
+    if (!sizer)
+        return;
+
+    for (wxSizerItem* item : sizer->GetChildren()) {
+        item->Show(show);
+        if (wxWindow* win = item->GetWindow())
+            win->Show(show);
+        if (wxSizer* child_sizer = item->GetSizer())
+            show_sizer_items_recursive(child_sizer, show);
+    }
+}
 
 const t_field& OptionsGroup::build_field(const Option& opt) { return build_field(opt.opt_id, opt.opt); }
 const t_field& OptionsGroup::build_field(const t_config_option_key& id)
@@ -197,13 +212,17 @@ void OptionsGroup::apply_collapsed_state()
     const bool show_content = !m_collapsed;
     if (m_content_spacer)
         m_content_spacer->Show(show_content);
-    m_grid_sizer->ShowItems(show_content);
+    show_sizer_items_recursive(m_grid_sizer, show_content);
     sizer->Show(m_grid_sizer, show_content, false);
 
     if (stb)
         stb->SetCursor(wxCursor(wxCURSOR_HAND));
     if (m_parent) {
         m_parent->Layout();
+        if (wxScrolledWindow* scrolled = dynamic_cast<wxScrolledWindow*>(m_parent))
+            scrolled->FitInside();
+        if (wxWindow* parent = m_parent->GetParent())
+            parent->Layout();
         m_parent->Refresh();
     }
 }
@@ -555,9 +574,8 @@ bool OptionsGroup::activate(std::function<void()> throw_if_canceled /* = [](){}*
                 sizer->Add(stl, 0, wxEXPAND);
                 m_content_spacer = sizer->AddSpacer(8);
                 stl->SetCursor(wxCursor(wxCURSOR_HAND));
-                stl->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) {
+                stl->Bind(wxEVT_LEFT_UP, [this](wxMouseEvent&) {
                     toggle_collapse();
-                    event.Skip();
                 });
             }
             this->stb = stl;
