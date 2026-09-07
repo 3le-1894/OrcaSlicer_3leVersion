@@ -13,6 +13,7 @@ blib
 xs/buildtmp
 *.o
 *.log
+log_iotc.txt
 MANIFEST.bak
 xs/MANIFEST.bak
 xs/assertlib*
