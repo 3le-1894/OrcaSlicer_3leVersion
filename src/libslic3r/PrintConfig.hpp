@@ -408,9 +408,6 @@ enum BedType {
     btPTE,
     btPCT,
     btSuperTack,
-    btCustom1,
-    btCustom2,
-    btCustom3,
     btCount
 };
 
@@ -590,15 +587,6 @@ static std::string bed_type_to_gcode_string(const BedType type)
     case btPTE:
         type_str = "textured_plate";
         break;
-    case btCustom1:
-        type_str = "custom_plate_1";
-        break;
-    case btCustom2:
-        type_str = "custom_plate_2";
-        break;
-    case btCustom3:
-        type_str = "custom_plate_3";
-        break;
     default:
         type_str = "unknown";
         break;
@@ -627,15 +615,6 @@ static std::string get_bed_temp_key(const BedType type)
     if (type == btPTE)
         return "textured_plate_temp";
 
-    if (type == btCustom1)
-        return "custom_plate_1_temp";
-
-    if (type == btCustom2)
-        return "custom_plate_2_temp";
-
-    if (type == btCustom3)
-        return "custom_plate_3_temp";
-
     return "";
 }
 
@@ -658,15 +637,6 @@ static std::string get_bed_temp_1st_layer_key(const BedType type)
 
     if (type == btPTE)
         return "textured_plate_temp_initial_layer";
-
-    if (type == btCustom1)
-        return "custom_plate_1_temp_initial_layer";
-
-    if (type == btCustom2)
-        return "custom_plate_2_temp_initial_layer";
-
-    if (type == btCustom3)
-        return "custom_plate_3_temp_initial_layer";
 
     return "";
 }
@@ -1798,18 +1768,12 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInts,               eng_plate_temp))
     ((ConfigOptionInts,               hot_plate_temp)) // hot is short for high temperature
     ((ConfigOptionInts,               textured_plate_temp))
-    ((ConfigOptionInts,               custom_plate_1_temp))
-    ((ConfigOptionInts,               custom_plate_2_temp))
-    ((ConfigOptionInts,               custom_plate_3_temp))
     ((ConfigOptionInts,               supertack_plate_temp_initial_layer))
     ((ConfigOptionInts,               cool_plate_temp_initial_layer))
     ((ConfigOptionInts,               textured_cool_plate_temp_initial_layer))
     ((ConfigOptionInts,               eng_plate_temp_initial_layer))
     ((ConfigOptionInts,               hot_plate_temp_initial_layer)) // hot is short for high temperature
     ((ConfigOptionInts,               textured_plate_temp_initial_layer))
-    ((ConfigOptionInts,               custom_plate_1_temp_initial_layer))
-    ((ConfigOptionInts,               custom_plate_2_temp_initial_layer))
-    ((ConfigOptionInts,               custom_plate_3_temp_initial_layer))
     ((ConfigOptionBools,              enable_overhang_bridge_fan))
     ((ConfigOptionInts,               overhang_fan_speed))
     ((ConfigOptionEnumsGeneric,       overhang_fan_threshold))

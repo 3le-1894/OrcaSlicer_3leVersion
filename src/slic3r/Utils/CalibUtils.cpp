@@ -42,7 +42,7 @@ static const std::string gcode_filename  = "temp.gcode";
 static const std::string model_filename  = "test.3mf";
 static const std::string config_filename = "test_config.3mf";
 
-static std::string MachineBedTypeString[btCount] = {
+static std::string MachineBedTypeString[7] = {
     "auto",
     "suprtack",
     "pc",
@@ -50,9 +50,6 @@ static std::string MachineBedTypeString[btCount] = {
     "pei",
     "pte",
     "pct",
-    "custom_plate_1",
-    "custom_plate_2",
-    "custom_plate_3",
 };
 
 static wxString nozzle_not_set_text = _L("The printer nozzle information has not been set.\nPlease configure it before proceeding with the calibration.");

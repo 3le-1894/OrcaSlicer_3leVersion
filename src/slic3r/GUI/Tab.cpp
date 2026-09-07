@@ -4427,27 +4427,6 @@ void TabFilament::build()
         line.append_option(optgroup->get_option("textured_plate_temp"));
         optgroup->append_line(line);
 
-        line = { L("Custom Plate 1"),
-                 L("This is the bed temperature when Custom Plate 1 is installed. A value of 0 means the filament does not support printing on Custom Plate 1.") };
-        line.label_path = "material_temperatures#bed";
-        line.append_option(optgroup->get_option("custom_plate_1_temp_initial_layer"));
-        line.append_option(optgroup->get_option("custom_plate_1_temp"));
-        optgroup->append_line(line);
-
-        line = { L("Custom Plate 2"),
-                 L("This is the bed temperature when Custom Plate 2 is installed. A value of 0 means the filament does not support printing on Custom Plate 2.") };
-        line.label_path = "material_temperatures#bed";
-        line.append_option(optgroup->get_option("custom_plate_2_temp_initial_layer"));
-        line.append_option(optgroup->get_option("custom_plate_2_temp"));
-        optgroup->append_line(line);
-
-        line = { L("Custom Plate 3"),
-                 L("This is the bed temperature when Custom Plate 3 is installed. A value of 0 means the filament does not support printing on Custom Plate 3.") };
-        line.label_path = "material_temperatures#bed";
-        line.append_option(optgroup->get_option("custom_plate_3_temp_initial_layer"));
-        line.append_option(optgroup->get_option("custom_plate_3_temp"));
-        optgroup->append_line(line);
-
         optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value)
         {
             DynamicPrintConfig& filament_config = m_preset_bundle->filaments.get_edited_preset().config;
@@ -4775,9 +4754,7 @@ void TabFilament::toggle_options()
 
         const std::vector<std::string> bed_temp_keys = {"supertack_plate_temp_initial_layer", "cool_plate_temp_initial_layer",
                                                         "textured_cool_plate_temp_initial_layer", "eng_plate_temp_initial_layer",
-                                                        "textured_plate_temp_initial_layer", "hot_plate_temp_initial_layer",
-                                                        "custom_plate_1_temp_initial_layer", "custom_plate_2_temp_initial_layer",
-                                                        "custom_plate_3_temp_initial_layer"};
+                                                        "textured_plate_temp_initial_layer", "hot_plate_temp_initial_layer"};
 
         bool support_multi_bed_types = std::find(bed_temp_keys.begin(), bed_temp_keys.end(), bed_temp_1st_layer_key) ==
                                            bed_temp_keys.end() ||
