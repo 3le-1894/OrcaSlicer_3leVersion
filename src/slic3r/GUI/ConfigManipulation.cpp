@@ -31,6 +31,42 @@ std::string trim_copy(const std::string& text)
     return text.substr(first, last - first + 1);
 }
 
+bool printer_supports_circle_compensation(PresetBundle* preset_bundle)
+{
+    if (preset_bundle == nullptr)
+        return false;
+
+    const Preset& printer_preset = preset_bundle->printers.get_edited_preset();
+
+    if (printer_preset.config.has("support_circle_compensation") &&
+        printer_preset.config.opt_bool("support_circle_compensation"))
+        return true;
+
+    const DynamicPrintConfig full_config = preset_bundle->full_config();
+    if (full_config.has("support_circle_compensation") &&
+        full_config.opt_bool("support_circle_compensation"))
+        return true;
+
+    std::vector<std::string> printer_identifiers;
+    printer_identifiers.emplace_back(printer_preset.name);
+    printer_identifiers.emplace_back(printer_preset.inherits());
+
+    if (printer_preset.config.has("printer_model"))
+        printer_identifiers.emplace_back(printer_preset.config.opt_string("printer_model"));
+
+    if (full_config.has("printer_model"))
+        printer_identifiers.emplace_back(full_config.opt_string("printer_model"));
+
+    for (const std::string& identifier : printer_identifiers)
+        if (identifier.find("X2D") != std::string::npos ||
+            identifier.find("H2C") != std::string::npos ||
+            identifier.find("H2D") != std::string::npos ||
+            identifier.find("H2S") != std::string::npos)
+            return true;
+
+    return false;
+}
+
 } // namespace
 
 void ConfigManipulation::apply(DynamicPrintConfig* config, DynamicPrintConfig* new_config)
@@ -390,9 +426,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         is_msg_dlg_already_exist = false;
     }
 
-    const DynamicPrintConfig& printer_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
-    const bool support_circle_compensation = printer_config.has("support_circle_compensation") &&
-                                             printer_config.opt_bool("support_circle_compensation");
+    const bool support_circle_compensation = printer_supports_circle_compensation(wxGetApp().preset_bundle);
 
     if (!support_circle_compensation && config->opt_bool("enable_circle_compensation")) {
         DynamicPrintConfig new_conf = *config;
@@ -1137,9 +1171,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, in
     for (auto el : { "hole_to_polyhole_threshold", "hole_to_polyhole_twisted", "hole_to_polyhole_max_edges" })
         toggle_line(el, config->opt_bool("hole_to_polyhole"));
 
-    const DynamicPrintConfig& printer_config = preset_bundle->printers.get_edited_preset().config;
-    bool support_circle_compensation = printer_config.has("support_circle_compensation") &&
-                                       printer_config.opt_bool("support_circle_compensation");
+    bool support_circle_compensation = printer_supports_circle_compensation(preset_bundle);
     bool enable_circle_compensation = support_circle_compensation && config->opt_bool("enable_circle_compensation");
     toggle_line("enable_circle_compensation", support_circle_compensation);
     toggle_field("xy_hole_compensation", !enable_circle_compensation);
