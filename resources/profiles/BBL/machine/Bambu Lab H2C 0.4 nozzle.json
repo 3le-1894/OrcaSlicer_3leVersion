@@ -11,6 +11,7 @@
 	],
 	"printer_model": "Bambu Lab H2C",
 	"printer_variant": "0.4",
+	"support_circle_compensation": "1",
 	"farthest_point_timelapse": "1",
 	"default_filament_profile": [
 		"Bambu PLA Basic @BBL H2C"

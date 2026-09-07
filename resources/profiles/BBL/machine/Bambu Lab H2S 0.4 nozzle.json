@@ -10,6 +10,7 @@
 	],
 	"printer_model": "Bambu Lab H2S",
 	"printer_variant": "0.4",
+	"support_circle_compensation": "1",
 	"bed_exclude_area": [],
 	"default_filament_profile": [
 		"Bambu PLA Basic @BBL H2S"

@@ -11,6 +11,7 @@
 	],
 	"printer_model": "Bambu Lab H2D Pro",
 	"printer_variant": "0.2",
+	"support_circle_compensation": "1",
 	"default_filament_profile": [
 		"Bambu PLA Basic @BBL H2DP 0.2 nozzle"
 	],

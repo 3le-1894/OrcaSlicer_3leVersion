@@ -304,6 +304,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "filament_shrinkage_compensation_z"
             || opt_key == "resolution"
             || opt_key == "precise_z_height"
+            || opt_key == "support_circle_compensation"
             || opt_key == "enable_circle_compensation"
             || opt_key == "circle_compensation_manual_offset"
             || opt_key == "circle_compensation_speed"

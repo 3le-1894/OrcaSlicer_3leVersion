@@ -390,7 +390,19 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         is_msg_dlg_already_exist = false;
     }
 
-    if (config->opt_bool("enable_circle_compensation") &&
+    const DynamicPrintConfig& printer_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
+    const bool support_circle_compensation = printer_config.has("support_circle_compensation") &&
+                                             printer_config.opt_bool("support_circle_compensation");
+
+    if (!support_circle_compensation && config->opt_bool("enable_circle_compensation")) {
+        DynamicPrintConfig new_conf = *config;
+        is_msg_dlg_already_exist = true;
+        new_conf.set_key_value("enable_circle_compensation", new ConfigOptionBool(false));
+        apply(config, &new_conf);
+        is_msg_dlg_already_exist = false;
+    }
+
+    if (support_circle_compensation && config->opt_bool("enable_circle_compensation") &&
         (config->option<ConfigOptionFloat>("xy_contour_compensation")->value != 0 ||
          config->option<ConfigOptionFloat>("xy_hole_compensation")->value != 0)) {
         DynamicPrintConfig new_conf = *config;
@@ -1125,7 +1137,11 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, in
     for (auto el : { "hole_to_polyhole_threshold", "hole_to_polyhole_twisted", "hole_to_polyhole_max_edges" })
         toggle_line(el, config->opt_bool("hole_to_polyhole"));
 
-    bool enable_circle_compensation = config->opt_bool("enable_circle_compensation");
+    const DynamicPrintConfig& printer_config = preset_bundle->printers.get_edited_preset().config;
+    bool support_circle_compensation = printer_config.has("support_circle_compensation") &&
+                                       printer_config.opt_bool("support_circle_compensation");
+    bool enable_circle_compensation = support_circle_compensation && config->opt_bool("enable_circle_compensation");
+    toggle_line("enable_circle_compensation", support_circle_compensation);
     toggle_field("xy_hole_compensation", !enable_circle_compensation);
     toggle_field("xy_contour_compensation", !enable_circle_compensation);
     toggle_line("circle_compensation_manual_offset", enable_circle_compensation);

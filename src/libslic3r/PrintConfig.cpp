@@ -4345,6 +4345,12 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("support_circle_compensation", coBool);
+    def->label = L("Support auto circle contour-hole compensation");
+    def->tooltip = L("Enable this if the printer supports auto circle contour-hole compensation.");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("gcode_flavor", coEnum);
     def->label = L("G-code flavor");
     def->tooltip = L("What kind of G-code the printer is compatible with.");
