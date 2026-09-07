@@ -4,7 +4,9 @@
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace Slic3r {
 
@@ -102,6 +104,40 @@ void Polygon::douglas_peucker(double tolerance)
     Points p = MultiPoint::_douglas_peucker(this->points, tolerance);
     p.pop_back();
     this->points = std::move(p);
+}
+
+bool Polygon::is_approx_circle(double max_deviation, double max_variance, Point &center, double &diameter) const
+{
+    if (this->points.size() < 8)
+        return false;
+
+    center = this->centroid();
+
+    std::vector<double> distances;
+    distances.reserve(this->points.size());
+    for (const Point &point : this->points) {
+        const double dx = double(point.x() - center.x());
+        const double dy = double(point.y() - center.y());
+        distances.push_back(std::sqrt(dx * dx + dy * dy));
+    }
+
+    const auto [min_it, max_it] = std::minmax_element(distances.begin(), distances.end());
+    if ((*max_it - *min_it) > max_deviation)
+        return false;
+
+    const double avg_dist = std::accumulate(distances.begin(), distances.end(), 0.0) / double(distances.size());
+    double variance = 0.0;
+    for (double distance : distances) {
+        const double delta = distance - avg_dist;
+        variance += delta * delta;
+    }
+    variance /= double(distances.size());
+
+    if (variance > max_variance)
+        return false;
+
+    diameter = 2.0 * avg_dist;
+    return true;
 }
 
 Polygons Polygon::simplify(double tolerance) const

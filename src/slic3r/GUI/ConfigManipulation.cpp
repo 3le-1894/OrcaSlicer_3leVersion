@@ -390,6 +390,17 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         is_msg_dlg_already_exist = false;
     }
 
+    if (config->opt_bool("enable_circle_compensation") &&
+        (config->option<ConfigOptionFloat>("xy_contour_compensation")->value != 0 ||
+         config->option<ConfigOptionFloat>("xy_hole_compensation")->value != 0)) {
+        DynamicPrintConfig new_conf = *config;
+        is_msg_dlg_already_exist = true;
+        new_conf.set_key_value("xy_contour_compensation", new ConfigOptionFloat(0));
+        new_conf.set_key_value("xy_hole_compensation", new ConfigOptionFloat(0));
+        apply(config, &new_conf);
+        is_msg_dlg_already_exist = false;
+    }
+
     if (config->option<ConfigOptionFloat>("elefant_foot_compensation")->value > 1)
     {
         const wxString msg_text = _(L("The elephant foot compensation value is too large.\nIf there are significant elephant foot issues, please check other settings.\nThe bed temperature may be too high, for example.\n\nThe value will be reset to 0."));
@@ -1113,6 +1124,11 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig *config, in
 
     for (auto el : { "hole_to_polyhole_threshold", "hole_to_polyhole_twisted", "hole_to_polyhole_max_edges" })
         toggle_line(el, config->opt_bool("hole_to_polyhole"));
+
+    bool enable_circle_compensation = config->opt_bool("enable_circle_compensation");
+    toggle_field("xy_hole_compensation", !enable_circle_compensation);
+    toggle_field("xy_contour_compensation", !enable_circle_compensation);
+    toggle_line("circle_compensation_manual_offset", enable_circle_compensation);
 
     bool has_detect_overhang_wall = config->opt_bool("detect_overhang_wall");
     bool has_overhang_reverse     = config->opt_bool("overhang_reverse");

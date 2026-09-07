@@ -1171,6 +1171,8 @@ static std::vector<std::string> s_Preset_print_options{
     "elefant_foot_layers_density",
     "xy_contour_compensation",
     "xy_hole_compensation",
+    "enable_circle_compensation",
+    "circle_compensation_manual_offset",
     "resolution",
     "enable_prime_tower",
     "prime_tower_enable_framework",
@@ -1384,6 +1386,8 @@ static std::vector<std::string> s_Preset_filament_options {/*"filament_colour", 
     "filament_extruder_variant",
     //SoftFever
     "enable_pressure_advance", "pressure_advance","adaptive_pressure_advance","adaptive_pressure_advance_model","adaptive_pressure_advance_overhangs", "adaptive_pressure_advance_bridges","chamber_temperature", "filament_shrink","filament_shrinkage_compensation_z", "support_material_interface_fan_speed","internal_bridge_fan_speed", "filament_notes" /*,"filament_seam_gap"*/,
+    "circle_compensation_speed", "counter_coef_1", "counter_coef_2", "counter_coef_3", "hole_coef_1", "hole_coef_2", "hole_coef_3",
+    "counter_limit_min", "counter_limit_max", "hole_limit_min", "hole_limit_max", "diameter_limit",
     "ironing_fan_speed",
     // Filament ironing overrides
     "filament_ironing_flow", "filament_ironing_spacing", "filament_ironing_inset", "filament_ironing_speed",

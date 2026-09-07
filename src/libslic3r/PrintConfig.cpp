@@ -7761,6 +7761,103 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("enable_circle_compensation", coBool);
+    def->label = L("Auto circle contour-hole compensation");
+    def->category = L("Quality");
+    def->tooltip = L("Experimental feature to compensate circular holes and circular contours. "
+                     "This can improve dimensional accuracy for circle holes and contours below the configured diameter limit.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("circle_compensation_manual_offset", coFloat);
+    def->label = L("User Customized Offset");
+    def->category = L("Quality");
+    def->sidetext = L("mm");
+    def->tooltip = L("Manual tuning offset for auto circle contour-hole compensation. Positive values tighten the fit; negative values loosen the fit.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("circle_compensation_speed", coFloats);
+    def->label = L("Circle Compensation Speed");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->sidetext = L("mm/s");
+    def->mode = comDevelop;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloats{200});
+
+    def = this->add("counter_coef_1", coFloats);
+    def->label = L("Contour Coef 1");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{0});
+
+    def = this->add("counter_coef_2", coFloats);
+    def->label = L("Contour Coef 2");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{0.008});
+
+    def = this->add("counter_coef_3", coFloats);
+    def->label = L("Contour Coef 3");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->sidetext = L("mm");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{-0.041});
+
+    def = this->add("hole_coef_1", coFloats);
+    def->label = L("Hole Coef 1");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{0});
+
+    def = this->add("hole_coef_2", coFloats);
+    def->label = L("Hole Coef 2");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{-0.025});
+
+    def = this->add("hole_coef_3", coFloats);
+    def->label = L("Hole Coef 3");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->sidetext = L("mm");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{0.28});
+
+    def = this->add("counter_limit_min", coFloats);
+    def->label = L("Contour limit min");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->sidetext = L("mm");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{-0.035});
+
+    def = this->add("counter_limit_max", coFloats);
+    def->label = L("Contour limit max");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->sidetext = L("mm");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{0.033});
+
+    def = this->add("hole_limit_min", coFloats);
+    def->label = L("Hole limit min");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->sidetext = L("mm");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{0.08});
+
+    def = this->add("hole_limit_max", coFloats);
+    def->label = L("Hole limit max");
+    def->tooltip = L("Internal filament parameter used by auto circle contour-hole compensation.");
+    def->sidetext = L("mm");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{0.25});
+
+    def = this->add("diameter_limit", coFloats);
+    def->label = L("Diameter limit");
+    def->tooltip = L("Maximum detected circle diameter affected by auto circle contour-hole compensation.");
+    def->sidetext = L("mm");
+    def->mode = comDevelop;
+    def->set_default_value(new ConfigOptionFloats{50});
+
     def = this->add("hole_to_polyhole", coBool);
     def->label = L("Convert holes to polyholes");
     def->category = L("Quality");

@@ -12,11 +12,22 @@
 
 #include <string>
 #include <map>
+#include <algorithm>
 
 #include <boost/log/trivial.hpp>
 #include <boost/algorithm/clamp.hpp>
 
+static const double circle_compensation_max_deviation = scale_(0.5);
+static const double circle_compensation_max_variance  = 5.0 * scale_(0.01) * scale_(0.01);
+
 namespace Slic3r {
+
+static double circle_compensation_value_or_default(const std::vector<double> &values, size_t idx, double fallback)
+{
+    if (values.empty())
+        return fallback;
+    return values[std::min(idx, values.size() - 1)];
+}
 
 Flow LayerRegion::flow(FlowRole role) const
 {
@@ -76,6 +87,58 @@ void LayerRegion::slices_to_fill_surfaces_clipped()
         const SurfacesPtr &this_surfaces = by_surface[surface_type];
         if (! this_surfaces.empty())
             this->fill_surfaces.append(intersection_ex(this_surfaces, this->fill_expolygons), SurfaceType(surface_type));
+    }
+}
+
+void LayerRegion::auto_circle_compensation(SurfaceCollection &slices, const AutoContourHolesCompensationParams &params, float manual_offset)
+{
+    const int wall_filament = this->region().config().outer_wall_filament_id.value;
+    const size_t filament_idx = wall_filament > 0 ? size_t(wall_filament - 1) : 0;
+
+    const double limited_speed           = circle_compensation_value_or_default(params.circle_compensation_speed, filament_idx, 200.0);
+    const double counter_speed_coef      = circle_compensation_value_or_default(params.counter_speed_coef, filament_idx, 0.0);
+    const double counter_diameter_coef   = circle_compensation_value_or_default(params.counter_diameter_coef, filament_idx, 0.008);
+    const double counter_compensate_coef = scale_(circle_compensation_value_or_default(params.counter_compensate_coef, filament_idx, -0.041));
+
+    const double hole_speed_coef         = circle_compensation_value_or_default(params.hole_speed_coef, filament_idx, 0.0);
+    const double hole_diameter_coef      = circle_compensation_value_or_default(params.hole_diameter_coef, filament_idx, -0.025);
+    const double hole_compensate_coef    = scale_(circle_compensation_value_or_default(params.hole_compensate_coef, filament_idx, 0.28));
+
+    const double counter_limit_min_value = scale_(circle_compensation_value_or_default(params.counter_limit_min_value, filament_idx, -0.035));
+    const double counter_limit_max_value = scale_(circle_compensation_value_or_default(params.counter_limit_max_value, filament_idx, 0.033));
+    const double hole_limit_min_value    = scale_(circle_compensation_value_or_default(params.hole_limit_min_value, filament_idx, 0.08));
+    const double hole_limit_max_value    = scale_(circle_compensation_value_or_default(params.hole_limit_max_value, filament_idx, 0.25));
+    const double diameter_limit_value    = scale_(circle_compensation_value_or_default(params.diameter_limit, filament_idx, 50.0));
+
+    for (Surface &surface : slices.surfaces) {
+        Point center;
+        double diameter = 0.0;
+
+        if (surface.expolygon.contour.is_approx_circle(circle_compensation_max_deviation, circle_compensation_max_variance, center, diameter) &&
+            diameter <= diameter_limit_value) {
+            double offset_value = scale_(counter_speed_coef * limited_speed) + counter_diameter_coef * diameter + counter_compensate_coef;
+            offset_value = boost::algorithm::clamp(offset_value, counter_limit_min_value, counter_limit_max_value);
+            offset_value -= manual_offset / 2.0;
+
+            Polygons offseted_polys = offset(surface.expolygon.contour, offset_value);
+            if (offseted_polys.size() == 1)
+                surface.expolygon.contour = std::move(offseted_polys.front());
+        }
+
+        for (Polygon &hole : surface.expolygon.holes) {
+            if (hole.is_approx_circle(circle_compensation_max_deviation, circle_compensation_max_variance, center, diameter) &&
+                diameter <= diameter_limit_value) {
+                double offset_value = scale_(hole_speed_coef * limited_speed) + hole_diameter_coef * diameter + hole_compensate_coef;
+                offset_value = boost::algorithm::clamp(offset_value, hole_limit_min_value, hole_limit_max_value);
+                // Positive hole compensation shrinks the hole, which is the opposite offset direction from contours.
+                offset_value = -offset_value;
+                offset_value -= manual_offset / 2.0;
+
+                Polygons offseted_polys = offset(hole, offset_value);
+                if (offseted_polys.size() == 1)
+                    hole = std::move(offseted_polys.front());
+            }
+        }
     }
 }
 

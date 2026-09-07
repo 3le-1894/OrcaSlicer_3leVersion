@@ -34,6 +34,16 @@ LayerRegion* Layer::add_region(const PrintRegion *print_region)
     return m_regions.back();
 }
 
+void Layer::apply_auto_circle_compensation()
+{
+    for (LayerRegion *layerm : m_regions) {
+        layerm->auto_circle_compensation(
+            layerm->slices,
+            this->object()->get_auto_circle_compensation_params(),
+            scale_(this->object()->config().circle_compensation_manual_offset));
+    }
+}
+
 // merge all regions' slices to get islands
 void Layer::make_slices()
 {

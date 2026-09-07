@@ -18,6 +18,7 @@ using LayerRegionPtrs = std::vector<LayerRegion*>;
 class PrintRegion;
 class PrintObject;
 class Print;
+struct AutoContourHolesCompensationParams;
 
 namespace FillAdaptive {
     struct Octree;
@@ -83,6 +84,7 @@ public:
     void    slices_to_fill_surfaces_clipped();
     void    prepare_fill_surfaces();
     //BBS
+    void    auto_circle_compensation(SurfaceCollection &slices, const AutoContourHolesCompensationParams &auto_contour_holes_compensation_params, float manual_offset = 0.0f);
     void    make_perimeters(const SurfaceCollection &slices, const LayerRegionPtrs &compatible_regions, SurfaceCollection* fill_surfaces, ExPolygons* fill_no_overlap);
     void    process_external_surfaces(const Layer *lower_layer, const Polygons *lower_layer_covered);
     double  infill_area_threshold() const;
@@ -172,6 +174,7 @@ public:
     const LayerRegionPtrs&  regions() const { return m_regions; }
     // Test whether whether there are any slices assigned to this layer.
     bool                    empty() const;
+    void                    apply_auto_circle_compensation();
     void                    make_slices();
     // Backup and restore raw sliced regions if needed.
     //FIXME Review whether not to simplify the code by keeping the raw_slices all the time.

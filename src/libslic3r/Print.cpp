@@ -301,6 +301,20 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "filament_shrinkage_compensation_z"
             || opt_key == "resolution"
             || opt_key == "precise_z_height"
+            || opt_key == "enable_circle_compensation"
+            || opt_key == "circle_compensation_manual_offset"
+            || opt_key == "circle_compensation_speed"
+            || opt_key == "counter_coef_1"
+            || opt_key == "counter_coef_2"
+            || opt_key == "counter_coef_3"
+            || opt_key == "hole_coef_1"
+            || opt_key == "hole_coef_2"
+            || opt_key == "hole_coef_3"
+            || opt_key == "counter_limit_min"
+            || opt_key == "counter_limit_max"
+            || opt_key == "hole_limit_min"
+            || opt_key == "hole_limit_max"
+            || opt_key == "diameter_limit"
             // Spiral Vase forces different kind of slicing than the normal model:
             // In Spiral Vase mode, holes are closed and only the largest area contour is kept at each layer.
             // Therefore toggling the Spiral Vase on / off requires complete reslicing.
@@ -2385,6 +2399,7 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
 
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": total object counts %1% in current print, need to slice %2%")%m_objects.size()%need_slicing_objects.size();
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
+    const AutoContourHolesCompensationParams auto_circle_compensation_params(m_config);
     if (!use_cache) {
         // Fire the SlicingPipeline hook for `obj` iff it just (re)computed `pstep` this pass.
         auto hook_after = [this](PrintObject* obj, bool was_done, PrintObjectStep pstep, SlicingPipelineStepPlugin sstep) {
@@ -2396,6 +2411,7 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
         for (PrintObject *obj : m_objects) {
             if (need_slicing_objects.count(obj) != 0) {
                 const bool was_done = obj->is_step_done(posSlice);
+                obj->set_auto_circle_compensation_params(auto_circle_compensation_params);
                 obj->slice();
                 hook_after(obj, was_done, posSlice, SlicingPipelineStepPlugin::posSlice);
                 // re-snapshot each layer's raw_slices AFTER the Slice hook ran, so the
@@ -2416,6 +2432,7 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
         for (PrintObject *obj : m_objects) {
             if (need_slicing_objects.count(obj) != 0) {
                 const bool was_done = obj->is_step_done(posPerimeters);
+                obj->set_auto_circle_compensation_params(auto_circle_compensation_params);
                 obj->make_perimeters();   // slice() inside is a no-op: posSlice already DONE
                 hook_after(obj, was_done, posPerimeters, SlicingPipelineStepPlugin::posPerimeters);
             } else {
@@ -2540,6 +2557,7 @@ void Print::process(long long *time_cost_with_cache, bool use_cache)
                     obj->set_done(posDetectOverhangsForLift);
             }
             else {
+                obj->set_auto_circle_compensation_params(auto_circle_compensation_params);
                 obj->make_perimeters();
                 obj->infill();
                 obj->ironing();
