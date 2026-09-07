@@ -210,6 +210,24 @@
 	"hot_plate_temp_initial_layer": [
 		"60"
 	],
+	"custom_plate_1_temp": [
+		"60"
+	],
+	"custom_plate_1_temp_initial_layer": [
+		"60"
+	],
+	"custom_plate_2_temp": [
+		"60"
+	],
+	"custom_plate_2_temp_initial_layer": [
+		"60"
+	],
+	"custom_plate_3_temp": [
+		"60"
+	],
+	"custom_plate_3_temp_initial_layer": [
+		"60"
+	],
 	"hole_coef_1": [
 		"0"
 	],

@@ -508,7 +508,10 @@ static const t_config_enum_values s_keys_map_BedType = {
     { "Engineering Plate",  btEP  },
     { "High Temp Plate",    btPEI  },
     { "Textured PEI Plate", btPTE },
-    { "Textured Cool Plate", btPCT }
+    { "Textured Cool Plate", btPCT },
+    { "Custom Plate 1",     btCustom1 },
+    { "Custom Plate 2",     btCustom2 },
+    { "Custom Plate 3",     btCustom3 }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(BedType)
 
@@ -1182,6 +1185,33 @@ void PrintConfigDef::init_fff_params()
     def->max = 300;
     def->set_default_value(new ConfigOptionInts{45});
 
+    def = this->add("custom_plate_1_temp", coInts);
+    def->label = L("Other layers");
+    def->tooltip = L("This is the bed temperature for layers except for the first one. A value of 0 means the filament does not support printing on Custom Plate 1.");
+    def->sidetext = L(u8"\u2103" /* °C */);	// degrees Celsius, CIS languages need translation
+    def->full_label = L("Bed temperature");
+    def->min = 0;
+    def->max = 300;
+    def->set_default_value(new ConfigOptionInts{45});
+
+    def = this->add("custom_plate_2_temp", coInts);
+    def->label = L("Other layers");
+    def->tooltip = L("This is the bed temperature for layers except for the first one. A value of 0 means the filament does not support printing on Custom Plate 2.");
+    def->sidetext = L(u8"\u2103" /* °C */);	// degrees Celsius, CIS languages need translation
+    def->full_label = L("Bed temperature");
+    def->min = 0;
+    def->max = 300;
+    def->set_default_value(new ConfigOptionInts{45});
+
+    def = this->add("custom_plate_3_temp", coInts);
+    def->label = L("Other layers");
+    def->tooltip = L("This is the bed temperature for layers except for the first one. A value of 0 means the filament does not support printing on Custom Plate 3.");
+    def->sidetext = L(u8"\u2103" /* °C */);	// degrees Celsius, CIS languages need translation
+    def->full_label = L("Bed temperature");
+    def->min = 0;
+    def->max = 300;
+    def->set_default_value(new ConfigOptionInts{45});
+
     def = this->add("supertack_plate_temp_initial_layer", coInts);
     def->label = L("First layer");
     def->full_label = L("First layer bed temperature");
@@ -1235,6 +1265,33 @@ void PrintConfigDef::init_fff_params()
     def->max = 300;
     def->set_default_value(new ConfigOptionInts{45});
 
+    def = this->add("custom_plate_1_temp_initial_layer", coInts);
+    def->label = L("First layer");
+    def->full_label = L("First layer bed temperature");
+    def->tooltip = L("This is the bed temperature of the first layer. A value of 0 means the filament does not support printing on Custom Plate 1.");
+    def->sidetext = L(u8"\u2103" /* °C */);	// degrees Celsius, CIS languages need translation
+    def->min = 0;
+    def->max = 300;
+    def->set_default_value(new ConfigOptionInts{45});
+
+    def = this->add("custom_plate_2_temp_initial_layer", coInts);
+    def->label = L("First layer");
+    def->full_label = L("First layer bed temperature");
+    def->tooltip = L("This is the bed temperature of the first layer. A value of 0 means the filament does not support printing on Custom Plate 2.");
+    def->sidetext = L(u8"\u2103" /* °C */);	// degrees Celsius, CIS languages need translation
+    def->min = 0;
+    def->max = 300;
+    def->set_default_value(new ConfigOptionInts{45});
+
+    def = this->add("custom_plate_3_temp_initial_layer", coInts);
+    def->label = L("First layer");
+    def->full_label = L("First layer bed temperature");
+    def->tooltip = L("This is the bed temperature of the first layer. A value of 0 means the filament does not support printing on Custom Plate 3.");
+    def->sidetext = L(u8"\u2103" /* °C */);	// degrees Celsius, CIS languages need translation
+    def->min = 0;
+    def->max = 300;
+    def->set_default_value(new ConfigOptionInts{45});
+
     def = this->add("curr_bed_type", coEnum);
     def->label = L("Bed type");
     def->tooltip = L("Plate types supported by the printer");
@@ -1247,12 +1304,18 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.emplace_back("Textured PEI Plate");
     def->enum_values.emplace_back("Textured Cool Plate");
     def->enum_values.emplace_back("Supertack Plate");
+    def->enum_values.emplace_back("Custom Plate 1");
+    def->enum_values.emplace_back("Custom Plate 2");
+    def->enum_values.emplace_back("Custom Plate 3");
     def->enum_labels.emplace_back(L("Smooth Cool Plate"));
     def->enum_labels.emplace_back(L("Engineering Plate"));
     def->enum_labels.emplace_back(L("Smooth High Temp Plate"));
     def->enum_labels.emplace_back(L("Textured PEI Plate"));
     def->enum_labels.emplace_back(L("Textured Cool Plate"));
     def->enum_labels.emplace_back(L("Cool Plate (SuperTack)"));
+    def->enum_labels.emplace_back(L("Custom Plate 1"));
+    def->enum_labels.emplace_back(L("Custom Plate 2"));
+    def->enum_labels.emplace_back(L("Custom Plate 3"));
     def->set_default_value(new ConfigOptionEnum<BedType>(btPC));
 
     // Orca: allow profile maker to set default bed type in machine profile
