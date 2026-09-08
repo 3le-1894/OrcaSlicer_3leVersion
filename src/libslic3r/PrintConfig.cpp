@@ -4257,6 +4257,12 @@ void PrintConfigDef::init_fff_params()
     def->mode    = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("enable_vibration_compensation", coBool);
+    def->label = L("Vibration compensation");
+    def->tooltip = L("Enable Bambu vibration compensation commands in the machine start G-code.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
     // Orca: may remove this option later
     def =this->add("support_chamber_temp_control",coBool);
     def->label=L("Support controlling chamber temperature");

@@ -1586,6 +1586,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<GCodeFlavor>,   gcode_flavor))
     ((ConfigOptionBool,                gcode_skip_config_block))
     ((ConfigOptionFloat,               time_cost)) 
+    ((ConfigOptionBool,                enable_vibration_compensation))
     ((ConfigOptionString,              layer_change_gcode))
     ((ConfigOptionString,              time_lapse_gcode))
     ((ConfigOptionString,              wrapping_detection_gcode))
