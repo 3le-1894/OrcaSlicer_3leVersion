@@ -5659,6 +5659,16 @@ LayerResult GCode::process_layer(
             m_calib_config.set_key_value("outer_wall_speed", new ConfigOptionFloatsNullable({std::round(_speed)}));
             break;
         }
+        case CalibMode::Calib_Fan_Speed_Tower: {
+            const float fan_speed = std::clamp(this->interpolate_value_across_layers(static_cast<float>(print.calib_params().start),
+                                                                                     static_cast<float>(print.calib_params().end),
+                                                                                     static_cast<float>(print.calib_params().step)),
+                                               0.0f, 100.0f);
+            sprintf(buf, "; Calib_Fan_Speed_Tower: Z_HEIGHT: %g, fan_speed:%g%%\n", print_z, fan_speed);
+            gcode += buf;
+            gcode += writer().set_fan(static_cast<unsigned int>(std::round(fan_speed)));
+            break;
+        }
         case CalibMode::Calib_Vol_speed_Tower: {
             auto _speed = print.calib_params().start + print_z * print.calib_params().step;
             m_calib_config.set_key_value("outer_wall_speed", new ConfigOptionFloatsNullable({std::round(_speed)}));

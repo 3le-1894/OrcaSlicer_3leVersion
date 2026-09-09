@@ -4698,6 +4698,9 @@ void TabFilament::toggle_options()
         for (auto el : {"overhang_fan_speed", "overhang_fan_threshold", "internal_bridge_fan_speed"}) // ORCA: Add support for separate internal bridge fan speed control
             toggle_option(el, has_enable_overhang_bridge_fan);
 
+        const bool keep_fan_always_on = m_config->opt_bool("reduce_fan_stop_start_freq", 0);
+        toggle_line("fan_min_speed", keep_fan_always_on);
+
         // Orca: toggle dont slow down for external perimeters if
         bool has_slow_down_for_layer_cooling = m_config->opt_bool("slow_down_for_layer_cooling", 0);
         toggle_option("dont_slow_down_outer_wall", has_slow_down_for_layer_cooling);

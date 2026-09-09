@@ -16366,6 +16366,67 @@ void Plater::calib_VFA(const Calib_Params& params)
     p->background_process.fff_print()->set_calib_params(calib_params);
 }
 
+void Plater::calib_fan_speed(const Calib_Params& params)
+{
+    const auto calib_fan_speed_name = wxString::Format(L"Fan speed test");
+    new_project(false, false, calib_fan_speed_name);
+    wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
+    if (params.mode != CalibMode::Calib_Fan_Speed_Tower)
+        return;
+
+    if (!add_model(false, Slic3r::resources_dir() + "/calib/fan_speed/CoolingTower.stl"))
+        return;
+
+    auto print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
+    auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
+
+    auto obj = model().objects[0];
+    auto base_bb = obj->bounding_box_exact();
+    const double module_height = std::max(base_bb.size().z(), 0.1);
+    const int module_count = std::max(1, static_cast<int>(std::lround(std::abs(params.end - params.start) / params.step)) + 1);
+
+    // Treat the loaded STEP as one fan-speed module and stack enough copies to match the requested fan-speed steps.
+    // This turns a single overhang test module into a full tower without requiring a separate model asset for each range.
+    const size_t base_volume_count = obj->volumes.size();
+    for (int module_idx = 1; module_idx < module_count; ++module_idx) {
+        for (size_t volume_idx = 0; volume_idx < base_volume_count; ++volume_idx) {
+            ModelVolume* volume = obj->add_volume(*obj->volumes[volume_idx]);
+            volume->set_new_unique_id();
+            volume->translate(0.0, 0.0, module_height * module_idx);
+        }
+    }
+
+    obj->ensure_on_bed();
+
+    printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
+    filament_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats { 0.0 });
+    filament_config->set_key_value("slow_down_min_speed", new ConfigOptionFloats { 0.0 });
+    filament_config->set_key_value("slow_down_for_layer_cooling", new ConfigOptionBools{false});
+    set_config_values<bool, ConfigOptionBoolsNullable>(print_config, "enable_overhang_speed", false);
+    print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
+    print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
+    print_config->set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("top_shell_layers", new ConfigOptionInt(2));
+    print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(2));
+    print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(15));
+    print_config->set_key_value("detect_thin_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("spiral_mode", new ConfigOptionBool(false));
+    print_config->set_key_value("enable_wrapping_detection", new ConfigOptionBool(false));
+    print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
+    obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
+    obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
+    obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
+
+    changed_objects({ 0 });
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_ui_from_settings();
+    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_ui_from_settings();
+
+    p->background_process.fff_print()->set_calib_params(params);
+}
+
 void Plater::calib_input_shaping_freq(const Calib_Params& params)
 {
     const auto calib_input_shaping_name = wxString::Format(L"Input shaping Frequency test");

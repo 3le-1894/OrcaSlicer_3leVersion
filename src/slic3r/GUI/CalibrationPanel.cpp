@@ -30,6 +30,8 @@ wxString get_calibration_type_name(CalibMode cali_mode)
         return _L("Max Volumetric Speed");
     case CalibMode::Calib_Temp_Tower:
         return _L("Temperature");
+    case CalibMode::Calib_Fan_Speed_Tower:
+        return _L("Fan Speed");
     case CalibMode::Calib_Retraction_tower:
         return _L("Retraction");
     default:

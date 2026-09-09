@@ -47,6 +47,9 @@ static wxString get_default_name(wxString filament_name, CalibMode mode){
         break;
     case Slic3r::CalibMode::Calib_VFA_Tower:
         break;
+    case Slic3r::CalibMode::Calib_Fan_Speed_Tower:
+        filament_name += " Fan Speed Calibrated";
+        break;
     case Slic3r::CalibMode::Calib_Retraction_tower:
         break;
     case Slic3r::CalibMode::Calib_Input_shaping_freq:

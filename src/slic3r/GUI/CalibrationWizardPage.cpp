@@ -31,6 +31,8 @@ wxString get_cali_mode_caption_string(CalibMode mode)
         return _L("Flow Rate Calibration");
     if (mode == CalibMode::Calib_Vol_speed_Tower)
         return _L("Max Volumetric Speed Calibration");
+    if (mode == CalibMode::Calib_Fan_Speed_Tower)
+        return _L("Fan Speed Calibration");
     return "no cali_mode_caption";
 }
 
@@ -50,6 +52,8 @@ wxString get_calibration_wiki_page(CalibMode cali_mode)
         return wxString::Format("https://wiki.bambulab.com/%s/software/bambu-studio/calibration_volumetric", region);
     case CalibMode::Calib_Temp_Tower:
         return wxString::Format("https://wiki.bambulab.com/%s/software/bambu-studio/calibration_temperature", region);
+    case CalibMode::Calib_Fan_Speed_Tower:
+        return "";
     case CalibMode::Calib_Retraction_tower:
         return wxString::Format("https://wiki.bambulab.com/%s/software/bambu-studio/calibration_retraction", region);
     default:
