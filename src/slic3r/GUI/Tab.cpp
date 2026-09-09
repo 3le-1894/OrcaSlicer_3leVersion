@@ -4412,45 +4412,51 @@ void TabFilament::build()
 
         optgroup = page->new_optgroup(L("Bed temperature"), L"param_bed_temp");
         line = { L("Cool Plate (SuperTack)"),
-                 L("Bed temperature when the Cool Plate SuperTack is installed. A value of 0 means the filament does not support printing on the Cool Plate SuperTack.") };
+                 L("Bed temperature when the Cool Plate SuperTack is installed. First layer bed temperature is automatically set 5 °C higher when this value is changed. A value of 0 means the filament does not support printing on the Cool Plate SuperTack.") };
         line.label_path = "material_temperatures#bed";
-        line.append_option(optgroup->get_option("supertack_plate_temp_initial_layer"));
-        line.append_option(optgroup->get_option("supertack_plate_temp"));
+        Option supertack_plate_temp_opt = optgroup->get_option("supertack_plate_temp");
+        supertack_plate_temp_opt.opt.label = L("Bed Temp");
+        line.append_option(supertack_plate_temp_opt);
         optgroup->append_line(line);
 
         line = { L("Cool Plate"),
-                 L("This is the bed temperature when the Cool Plate is installed. A value of 0 means the filament does not support printing on the Cool Plate.") };
+                 L("This is the bed temperature when the Cool Plate is installed. First layer bed temperature is automatically set 5 °C higher when this value is changed. A value of 0 means the filament does not support printing on the Cool Plate.") };
         line.label_path = "material_temperatures#bed";
-        line.append_option(optgroup->get_option("cool_plate_temp_initial_layer"));
-        line.append_option(optgroup->get_option("cool_plate_temp"));
+        Option cool_plate_temp_opt = optgroup->get_option("cool_plate_temp");
+        cool_plate_temp_opt.opt.label = L("Bed Temp");
+        line.append_option(cool_plate_temp_opt);
         optgroup->append_line(line);
 
         line = { L("Textured Cool Plate"),
-                 L("This is the bed temperature when the Textured Cool Plate is installed. A value of 0 means the filament does not support printing on the Textured Cool Plate.") };
+                 L("This is the bed temperature when the Textured Cool Plate is installed. First layer bed temperature is automatically set 5 °C higher when this value is changed. A value of 0 means the filament does not support printing on the Textured Cool Plate.") };
         line.label_path = "material_temperatures#bed";
-        line.append_option(optgroup->get_option("textured_cool_plate_temp_initial_layer"));
-        line.append_option(optgroup->get_option("textured_cool_plate_temp"));
+        Option textured_cool_plate_temp_opt = optgroup->get_option("textured_cool_plate_temp");
+        textured_cool_plate_temp_opt.opt.label = L("Bed Temp");
+        line.append_option(textured_cool_plate_temp_opt);
         optgroup->append_line(line);
 
         line = { L("Engineering Plate"),
-                 L("This is the bed temperature when the engineering plate is installed. A value of 0 means the filament does not support printing on the Engineering Plate.") };
+                 L("This is the bed temperature when the engineering plate is installed. First layer bed temperature is automatically set 5 °C higher when this value is changed. A value of 0 means the filament does not support printing on the Engineering Plate.") };
         line.label_path = "material_temperatures#bed";
-        line.append_option(optgroup->get_option("eng_plate_temp_initial_layer"));
-        line.append_option(optgroup->get_option("eng_plate_temp"));
+        Option eng_plate_temp_opt = optgroup->get_option("eng_plate_temp");
+        eng_plate_temp_opt.opt.label = L("Bed Temp");
+        line.append_option(eng_plate_temp_opt);
         optgroup->append_line(line);
 
         line = { L("Smooth PEI Plate / High Temp Plate"),
-                 L("This is the bed temperature when the Smooth PEI Plate/High Temperature Plate is installed. A value of 0 means the filament does not support printing on the Smooth PEI Plate/High Temp Plate.") };
+                 L("This is the bed temperature when the Smooth PEI Plate/High Temperature Plate is installed. First layer bed temperature is automatically set 5 °C higher when this value is changed. A value of 0 means the filament does not support printing on the Smooth PEI Plate/High Temp Plate.") };
         line.label_path = "material_temperatures#bed";
-        line.append_option(optgroup->get_option("hot_plate_temp_initial_layer"));
-        line.append_option(optgroup->get_option("hot_plate_temp"));
+        Option hot_plate_temp_opt = optgroup->get_option("hot_plate_temp");
+        hot_plate_temp_opt.opt.label = L("Bed Temp");
+        line.append_option(hot_plate_temp_opt);
         optgroup->append_line(line);
 
         line = { L("Textured PEI Plate"),
-                 L("This is the bed temperature when the Textured PEI Plate is installed. A value of 0 means the filament does not support printing on the Textured PEI Plate.") };
+                 L("This is the bed temperature when the Textured PEI Plate is installed. First layer bed temperature is automatically set 5 °C higher when this value is changed. A value of 0 means the filament does not support printing on the Textured PEI Plate.") };
         line.label_path = "material_temperatures#bed";
-        line.append_option(optgroup->get_option("textured_plate_temp_initial_layer"));
-        line.append_option(optgroup->get_option("textured_plate_temp"));
+        Option textured_plate_temp_opt = optgroup->get_option("textured_plate_temp");
+        textured_plate_temp_opt.opt.label = L("Bed Temp");
+        line.append_option(textured_plate_temp_opt);
         optgroup->append_line(line);
 
         optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value)
@@ -4458,6 +4464,24 @@ void TabFilament::build()
             DynamicPrintConfig& filament_config = m_preset_bundle->filaments.get_edited_preset().config;
 
             update_dirty();
+            const auto sync_first_layer_bed_temp = [this, &opt_key, &value](const std::string& bed_temp_key, const std::string& first_layer_key) {
+                if (opt_key == bed_temp_key) {
+                    const int bed_temp = boost::any_cast<int>(value);
+                    change_opt_value(*m_config, first_layer_key, bed_temp + 5);
+                    on_value_change(first_layer_key, bed_temp + 5);
+                    return true;
+                }
+                return false;
+            };
+            if (sync_first_layer_bed_temp("supertack_plate_temp", "supertack_plate_temp_initial_layer") ||
+                sync_first_layer_bed_temp("cool_plate_temp", "cool_plate_temp_initial_layer") ||
+                sync_first_layer_bed_temp("textured_cool_plate_temp", "textured_cool_plate_temp_initial_layer") ||
+                sync_first_layer_bed_temp("eng_plate_temp", "eng_plate_temp_initial_layer") ||
+                sync_first_layer_bed_temp("hot_plate_temp", "hot_plate_temp_initial_layer") ||
+                sync_first_layer_bed_temp("textured_plate_temp", "textured_plate_temp_initial_layer")) {
+                on_value_change(opt_key, value);
+                return;
+            }
             /*if (opt_key == "cool_plate_temp" || opt_key == "cool_plate_temp_initial_layer") {
                 m_config_manipulation.check_bed_temperature_difference(BedType::btPC, &filament_config);
             }
