@@ -4390,11 +4390,25 @@ void TabFilament::build()
         };
 
         optgroup = page->new_optgroup(L("Print temperature"), L"param_extruder_temp");
-        line = { L("Nozzle"), L("Nozzle temperature when printing") };
+        line = { L("Print Temp"), L("Nozzle temperature when printing. First layer temperature is automatically set 5 °C higher when this value is changed.") };
         line.label_path = "material_temperatures#nozzle";
-        line.append_option(optgroup->get_option("nozzle_temperature_initial_layer", 0));
         line.append_option(optgroup->get_option("nozzle_temperature", 0));
         optgroup->append_line(line);
+        optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value)
+        {
+            DynamicPrintConfig& filament_config = m_preset_bundle->filaments.get_edited_preset().config;
+
+            if (opt_key == "nozzle_temperature#0" || opt_key == "nozzle_temperature") {
+                const int print_temp = boost::any_cast<int>(value);
+                const int first_layer_temp = print_temp + 5;
+                change_opt_value(*m_config, "nozzle_temperature_initial_layer", first_layer_temp, 0);
+                m_config_manipulation.check_nozzle_temperature_range(&filament_config);
+                m_config_manipulation.check_nozzle_temperature_initial_layer_range(&filament_config);
+                update_dirty();
+                on_value_change("nozzle_temperature", value);
+                on_value_change("nozzle_temperature_initial_layer", first_layer_temp);
+            }
+        };
 
         optgroup = page->new_optgroup(L("Bed temperature"), L"param_bed_temp");
         line = { L("Cool Plate (SuperTack)"),
