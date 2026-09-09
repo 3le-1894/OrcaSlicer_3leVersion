@@ -193,6 +193,8 @@ void OptionsGroup::set_max_win_width(int max_win_width)
 void OptionsGroup::toggle_collapse()
 {
     set_collapsed(!m_collapsed);
+    if (on_collapse_change)
+        on_collapse_change(m_collapsed);
 }
 
 void OptionsGroup::set_collapsed(bool collapsed)

@@ -66,6 +66,7 @@
 #endif // WIN32
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <unordered_set>
 
@@ -82,6 +83,17 @@ int mode_to_selection(ConfigOptionMode mode)
     return mode == comExpert ? 2 :
            mode == comAdvanced ? 1 :
            0;
+}
+
+std::string settings_group_collapse_key(int tab_type, const wxString& page_title, const wxString& group_title)
+{
+    std::string key = std::to_string(tab_type) + "|" + into_u8(page_title) + "|" + into_u8(group_title);
+    for (char& ch : key) {
+        const unsigned char uch = static_cast<unsigned char>(ch);
+        if (!std::isalnum(uch) && ch != '_' && ch != '-')
+            ch = '_';
+    }
+    return key;
 }
 }
 
@@ -4700,6 +4712,7 @@ void TabFilament::toggle_options()
 
         const bool keep_fan_always_on = m_config->opt_bool("reduce_fan_stop_start_freq", 0);
         toggle_line("fan_min_speed", keep_fan_always_on);
+        set_option_label("fan_max_speed", keep_fan_always_on ? L("Max fan speed threshold") : L("Static Fan Speed"));
 
         // Orca: toggle dont slow down for external perimeters if
         bool has_slow_down_for_layer_cooling = m_config->opt_bool("slow_down_for_layer_cooling", 0);
@@ -8670,6 +8683,18 @@ ConfigOptionsGroupShp Page::new_optgroup(const wxString &title, const wxString &
     auto tab = parent()->GetParent();// GetParent();
 #endif*/
     auto tab = m_tab_owner;
+    if (!title.IsEmpty() && wxGetApp().app_config != nullptr) {
+        const std::string collapse_key = settings_group_collapse_key(static_cast<int>(static_cast<Tab*>(tab)->type()), m_title, title);
+        const std::string collapsed    = wxGetApp().app_config->get("settings_group_collapsed", collapse_key);
+        if (!collapsed.empty())
+            optgroup->set_collapsed(collapsed == "true" || collapsed == "1");
+        optgroup->on_collapse_change = [collapse_key](bool collapsed) {
+            if (wxGetApp().app_config == nullptr)
+                return;
+            wxGetApp().app_config->set("settings_group_collapsed", collapse_key, collapsed);
+            wxGetApp().app_config->save();
+        };
+    }
     optgroup->set_config_category_and_type(m_title, static_cast<Tab*>(tab)->type());
     optgroup->m_on_change = [tab](t_config_option_key opt_key, boost::any value) {
         //! This function will be called from OptionGroup.
