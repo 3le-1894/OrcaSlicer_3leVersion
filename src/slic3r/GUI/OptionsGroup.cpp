@@ -21,6 +21,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include "libslic3r/Exception.hpp"
+#include "libslic3r/Preset.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "slic3r/plugin/PluginManager.hpp"
@@ -32,6 +33,45 @@ namespace Slic3r { namespace GUI {
 
 // BBS: new layout
 constexpr int titleWidth = 20;
+constexpr int uniformSettingsFieldWidth = 18;
+
+static bool is_process_selection_width_category(const wxString& category)
+{
+    return category == _L("Quality") ||
+           category == _L("Strength") ||
+           category == _L("Speed") ||
+           category == _L("Support") ||
+           category == _L("Multimaterial") ||
+           category == _L("Others") ||
+           category == _L("Other");
+}
+
+static bool is_printer_selection_width_category(const wxString& category)
+{
+    return category == _L("Basic information") ||
+           category == _L("Multimaterial");
+}
+
+static bool is_uniform_width_field(const ConfigOptionDef& opt)
+{
+    if (opt.full_width)
+        return false;
+
+    switch (opt.gui_type) {
+    case ConfigOptionDef::GUIType::color:
+    case ConfigOptionDef::GUIType::slider:
+    case ConfigOptionDef::GUIType::legend:
+    case ConfigOptionDef::GUIType::plugin_picker:
+    case ConfigOptionDef::GUIType::plugin_config:
+        return false;
+    default:
+        break;
+    }
+
+    return opt.type != coBool &&
+           opt.type != coBools &&
+           opt.type != coNone;
+}
 
 static void show_sizer_items_recursive(wxSizer* sizer, bool show)
 {
@@ -56,25 +96,36 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id)
 
 const t_field& OptionsGroup::build_field(const t_config_option_key& id, const ConfigOptionDef& opt)
 {
+    ConfigOptionDef adjusted_opt = opt;
+    if (auto* config_group = dynamic_cast<ConfigOptionsGroup*>(this);
+        config_group != nullptr &&
+        ((config_group->config_type() == Preset::TYPE_PRINT && is_process_selection_width_category(config_group->config_category())) ||
+         (config_group->config_type() == Preset::TYPE_PRINTER && is_printer_selection_width_category(config_group->config_category()))) &&
+        is_uniform_width_field(opt)) {
+        adjusted_opt.width = std::max(adjusted_opt.width, uniformSettingsFieldWidth);
+    }
+
+    const ConfigOptionDef& field_opt = adjusted_opt;
+
     // Check the gui_type field first, fall through
     // is the normal type.
-    switch (opt.gui_type) {
-    case ConfigOptionDef::GUIType::select_open: m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id)); break;
-    case ConfigOptionDef::GUIType::color: m_fields.emplace(id, ColourPicker::Create<ColourPicker>(this->ctrl_parent(), opt, id)); break;
+    switch (field_opt.gui_type) {
+    case ConfigOptionDef::GUIType::select_open: m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), field_opt, id)); break;
+    case ConfigOptionDef::GUIType::color: m_fields.emplace(id, ColourPicker::Create<ColourPicker>(this->ctrl_parent(), field_opt, id)); break;
     case ConfigOptionDef::GUIType::f_enum_open:
-    case ConfigOptionDef::GUIType::i_enum_open: m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id)); break;
-    case ConfigOptionDef::GUIType::slider: m_fields.emplace(id, SliderCtrl::Create<SliderCtrl>(this->ctrl_parent(), opt, id)); break;
+    case ConfigOptionDef::GUIType::i_enum_open: m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), field_opt, id)); break;
+    case ConfigOptionDef::GUIType::slider: m_fields.emplace(id, SliderCtrl::Create<SliderCtrl>(this->ctrl_parent(), field_opt, id)); break;
     case ConfigOptionDef::GUIType::legend: // StaticText
-        m_fields.emplace(id, StaticText::Create<StaticText>(this->ctrl_parent(), opt, id));
+        m_fields.emplace(id, StaticText::Create<StaticText>(this->ctrl_parent(), field_opt, id));
         break;
-    case ConfigOptionDef::GUIType::one_string: m_fields.emplace(id, TextCtrl::Create<TextCtrl>(this->ctrl_parent(), opt, id)); break;
-    case ConfigOptionDef::GUIType::plugin_picker: m_fields.emplace(id, PluginField::Create<PluginField>(this->ctrl_parent(), opt, id)); break;
-    case ConfigOptionDef::GUIType::plugin_config: m_fields.emplace(id, PluginConfigField::Create<PluginConfigField>(this->ctrl_parent(), opt, id)); break;
+    case ConfigOptionDef::GUIType::one_string: m_fields.emplace(id, TextCtrl::Create<TextCtrl>(this->ctrl_parent(), field_opt, id)); break;
+    case ConfigOptionDef::GUIType::plugin_picker: m_fields.emplace(id, PluginField::Create<PluginField>(this->ctrl_parent(), field_opt, id)); break;
+    case ConfigOptionDef::GUIType::plugin_config: m_fields.emplace(id, PluginConfigField::Create<PluginConfigField>(this->ctrl_parent(), field_opt, id)); break;
     case ConfigOptionDef::GUIType::printer_agent_select: m_fields.emplace(
-            id, PrinterAgentChoice::Create<PrinterAgentChoice>(this->ctrl_parent(), opt, id));
+            id, PrinterAgentChoice::Create<PrinterAgentChoice>(this->ctrl_parent(), field_opt, id));
         break;
     default:
-        switch (opt.type) {
+        switch (field_opt.type) {
             case coFloatOrPercent:
             case coFloatsOrPercents:
             case coFloat:
@@ -83,23 +134,23 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
 			case coPercents:
 			case coString:
 			case coStrings:
-                m_fields.emplace(id, TextCtrl::Create<TextCtrl>(this->ctrl_parent(), opt, id));
+                m_fields.emplace(id, TextCtrl::Create<TextCtrl>(this->ctrl_parent(), field_opt, id));
                 break;
 			case coBool:
 			case coBools:
-                m_fields.emplace(id, CheckBox::Create<CheckBox>(this->ctrl_parent(), opt, id));
+                m_fields.emplace(id, CheckBox::Create<CheckBox>(this->ctrl_parent(), field_opt, id));
 				break;
 			case coInt:
 			case coInts:
-                m_fields.emplace(id, SpinCtrl::Create<SpinCtrl>(this->ctrl_parent(), opt, id));
+                m_fields.emplace(id, SpinCtrl::Create<SpinCtrl>(this->ctrl_parent(), field_opt, id));
 				break;
             case coEnum:
             case coEnums:
-                m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id));
+                m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), field_opt, id));
 				break;
             case coPoint:
             case coPoints:
-                m_fields.emplace(id, PointCtrl::Create<PointCtrl>(this->ctrl_parent(), opt, id));
+                m_fields.emplace(id, PointCtrl::Create<PointCtrl>(this->ctrl_parent(), field_opt, id));
 				break;
             case coNone:   break;
             default:
