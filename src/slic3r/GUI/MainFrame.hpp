@@ -358,6 +358,7 @@ public:
     bool        is_printer_view() const;
     void        refresh_plugin_tips();
     void RunScript(wxString js);
+    void calculate_mvs_safe_speeds();
 
     //SoftFever
     void show_device(bool should_use_native);

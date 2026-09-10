@@ -53,6 +53,7 @@
 #include <string_view>
 
 #include "GUI_App.hpp"
+#include "GUI.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "MsgDialog.hpp"
 #include "Notebook.hpp"
@@ -78,6 +79,8 @@
 #include <gtk/gtk.h>
 #endif // __WXGTK__
 #include <slic3r/GUI/CreatePresetsDialog.hpp>
+
+#include <cmath>
 
 
 namespace Slic3r {
@@ -2762,6 +2765,95 @@ static void add_common_view_menu_items(wxMenu* view_menu, MainFrame* mainFrame, 
         "", nullptr, [can_change_view]() { return can_change_view(); }, mainFrame);
 }
 
+void MainFrame::calculate_mvs_safe_speeds()
+{
+    PresetBundle* preset_bundle = wxGetApp().preset_bundle;
+    if (preset_bundle == nullptr) {
+        MessageDialog msg(this, _L("Unable to calculate safe speeds. No preset bundle is loaded."),
+            _L("MVS safe speeds"), wxOK | wxICON_WARNING);
+        msg.ShowModal();
+        return;
+    }
+
+    DynamicPrintConfig& print_config = preset_bundle->prints.get_edited_preset().config;
+    const DynamicPrintConfig& filament_config = preset_bundle->filaments.get_edited_preset().config;
+    const DynamicPrintConfig& printer_config = preset_bundle->printers.get_edited_preset().config;
+
+    const auto* mvs_opt = filament_config.option<ConfigOptionFloats>("filament_max_volumetric_speed");
+    const double max_volumetric_speed = mvs_opt != nullptr && !mvs_opt->values.empty() ? mvs_opt->get_at(0) : 0.0;
+    const double layer_height = print_config.opt_float("layer_height");
+    const auto* nozzle_diameter_opt = printer_config.option<ConfigOptionFloats>("nozzle_diameter");
+    const double nozzle_diameter = nozzle_diameter_opt != nullptr && !nozzle_diameter_opt->values.empty() ? nozzle_diameter_opt->get_at(0) : 0.0;
+
+    if (max_volumetric_speed <= 0.0 || layer_height <= 0.0 || nozzle_diameter <= 0.0) {
+        MessageDialog msg(this,
+            _L("Unable to calculate safe speeds. The selected filament needs a max volumetric speed, the process needs a valid layer height, and the printer needs a valid nozzle diameter."),
+            _L("MVS safe speeds"), wxOK | wxICON_WARNING);
+        msg.ShowModal();
+        return;
+    }
+
+    static constexpr double mvs_safe_speed_factor = 0.80;
+    static constexpr double mvs_speed_rounding = 5.0;
+
+    struct SpeedLimit {
+        const char* speed_key;
+        const char* line_width_key;
+        const char* label;
+    };
+
+    const std::vector<SpeedLimit> speed_limits = {
+        { "outer_wall_speed",            "outer_wall_line_width",            "Outer wall" },
+        { "inner_wall_speed",            "inner_wall_line_width",            "Inner wall" },
+        { "sparse_infill_speed",         "sparse_infill_line_width",         "Sparse infill" },
+        { "internal_solid_infill_speed", "internal_solid_infill_line_width", "Internal solid infill" },
+        { "top_surface_speed",           "top_surface_line_width",           "Top surface" },
+        { "support_speed",               "support_line_width",               "Support" },
+        { "support_interface_speed",     "support_line_width",               "Support interface" },
+    };
+
+    int changed = 0;
+    wxString changes;
+    for (const SpeedLimit& limit : speed_limits) {
+        const double line_width = print_config.get_abs_value(limit.line_width_key, nozzle_diameter);
+        if (line_width <= 0.0)
+            continue;
+
+        const auto* speed_opt = print_config.option<ConfigOptionFloatsNullable>(limit.speed_key);
+        const double current_speed = speed_opt != nullptr && !speed_opt->values.empty() ? speed_opt->get_at(0) : 0.0;
+        if (current_speed <= 0.0)
+            continue;
+
+        const double raw_calculated_speed = std::max(1.0, std::floor((max_volumetric_speed / (line_width * layer_height)) * mvs_safe_speed_factor + 0.5));
+        const double calculated_speed = std::max(mvs_speed_rounding, std::floor(raw_calculated_speed / mvs_speed_rounding) * mvs_speed_rounding);
+        if (current_speed > calculated_speed) {
+            change_opt_value(print_config, limit.speed_key, calculated_speed);
+            changes += wxString::Format("%s: %.0f -> %.0f mm/s\n",
+                from_u8(limit.label), current_speed, calculated_speed);
+            ++changed;
+        }
+    }
+
+    if (changed == 0) {
+        MessageDialog msg(this,
+            _L("No speed changes were needed. The current absolute speed values are already at or below the calculated MVS-safe limits."),
+            _L("MVS safe speeds"), wxOK | wxICON_INFORMATION);
+        msg.ShowModal();
+        return;
+    }
+
+    if (Tab* print_tab = wxGetApp().get_tab(Preset::TYPE_PRINT); print_tab != nullptr) {
+        print_tab->update_dirty();
+        print_tab->reload_config();
+        print_tab->update_tab_ui();
+    }
+
+    MessageDialog msg(this,
+        _L("Updated these speed values:\n\n") + changes,
+        _L("MVS safe speeds"), wxOK | wxICON_INFORMATION);
+    msg.ShowModal();
+}
+
 void MainFrame::init_menubar_as_editor()
 {
 #ifdef __APPLE__
@@ -3508,6 +3600,11 @@ void MainFrame::init_menubar_as_editor()
             dlg->Destroy();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(custom_calib_menu, wxID_ANY, _L("Calculate MVS safe speeds"), _L("Calculate MVS safe speeds"),
+        [this](wxCommandEvent&) {
+            calculate_mvs_safe_speeds();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
     m_topbar->GetCalibMenu()->AppendSeparator();
     m_topbar->GetCalibMenu()->AppendSubMenu(custom_calib_menu, _L("3le Calibration"));
 
@@ -3656,6 +3753,11 @@ void MainFrame::init_menubar_as_editor()
             auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(custom_calib_menu, wxID_ANY, _L("Calculate MVS safe speeds"), _L("Calculate MVS safe speeds"),
+        [this](wxCommandEvent&) {
+            calculate_mvs_safe_speeds();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
     calib_menu->AppendSeparator();
