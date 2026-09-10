@@ -24,6 +24,7 @@ enum class CalibMode : int {
     Calib_Vol_speed_Tower,
     Calib_VFA_Tower,
     Calib_Fan_Speed_Tower,
+    Calib_Bridge_Speed,
     Calib_Retraction_tower,
     Calib_Input_shaping_freq,
     Calib_Input_shaping_damp,

@@ -3605,6 +3605,13 @@ void MainFrame::init_menubar_as_editor()
             dlg->Destroy();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
     m_topbar->GetCalibMenu()->AppendSeparator();
     m_topbar->GetCalibMenu()->AppendSubMenu(custom_calib_menu, _L("3le Calibration"));
 
@@ -3756,6 +3763,13 @@ void MainFrame::init_menubar_as_editor()
     append_menu_item(custom_calib_menu, wxID_ANY, _L("Fan speed"), _L("Fan speed"),
         [this](wxCommandEvent&) {
             auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         }, "", nullptr,

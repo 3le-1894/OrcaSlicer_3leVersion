@@ -5,6 +5,7 @@
 #include "libslic3r_version.h"
 
 #include <cstddef>
+#include <array>
 #include <algorithm>
 #include <chrono>
 #include <numeric>
@@ -16423,6 +16424,105 @@ void Plater::calib_fan_speed(const Calib_Params& params)
     wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_ui_from_settings();
     wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_ui_from_settings();
+
+    p->background_process.fff_print()->set_calib_params(params);
+}
+
+static indexed_triangle_set bridge_calib_make_box(double x, double y, double z, double width, double depth, double height)
+{
+    indexed_triangle_set box = its_make_cube(width, depth, height);
+    for (stl_vertex& vertex : box.vertices)
+        vertex += Vec3f(float(x), float(y), float(z));
+    return box;
+}
+
+static TriangleMesh bridge_calib_make_speed_group_mesh()
+{
+    static constexpr double support_width  = 6.0;
+    static constexpr double support_depth  = 10.0;
+    static constexpr double support_height = 6.0;
+    static constexpr double bridge_height  = 1.2;
+    static constexpr double coupon_gap     = 8.0;
+    const std::array<double, 3> spans = { 10.0, 20.0, 30.0 };
+
+    indexed_triangle_set mesh;
+    double x = 0.0;
+    for (double span : spans) {
+        const double coupon_width = support_width * 2.0 + span;
+
+        its_merge(mesh, bridge_calib_make_box(x, 0.0, 0.0, support_width, support_depth, support_height));
+        its_merge(mesh, bridge_calib_make_box(x + support_width + span, 0.0, 0.0, support_width, support_depth, support_height));
+        its_merge(mesh, bridge_calib_make_box(x, 0.0, support_height, coupon_width, support_depth, bridge_height));
+
+        x += coupon_width + coupon_gap;
+    }
+
+    return TriangleMesh(std::move(mesh));
+}
+
+void Plater::calib_bridge_speed(const Calib_Params& params)
+{
+    const auto calib_bridge_speed_name = wxString::Format(L"Bridge speed test");
+    new_project(false, false, calib_bridge_speed_name);
+    wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
+    if (params.mode != CalibMode::Calib_Bridge_Speed)
+        return;
+
+    std::vector<double> speeds;
+    for (double speed = params.start; speed <= params.end + 0.001; speed += params.step)
+        speeds.emplace_back(speed);
+    if (speeds.empty())
+        return;
+
+    auto print_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    auto printer_config = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
+
+    printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
+    print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
+    print_config->set_key_value("enable_support", new ConfigOptionBool(false));
+    print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
+    print_config->set_key_value("top_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(0));
+    print_config->set_key_value("detect_thin_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("spiral_mode", new ConfigOptionBool(false));
+    print_config->set_key_value("enable_wrapping_detection", new ConfigOptionBool(false));
+    print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
+
+    auto cur_plate = get_partplate_list().get_plate(0);
+    const Vec3d plate_origin = cur_plate ? cur_plate->get_origin() : Vec3d::Zero();
+    const double row_spacing = 35.0;
+
+    std::vector<size_t> object_idxs;
+    object_idxs.reserve(speeds.size());
+    for (size_t i = 0; i < speeds.size(); ++i) {
+        const double speed = speeds[i];
+        std::string name = "Bridge Speed " + std::to_string(static_cast<int>(std::round(speed))) + " mm-s";
+
+        ModelObject* obj = model().add_object(name.c_str(), "", bridge_calib_make_speed_group_mesh());
+        obj->name = name;
+        obj->config.set_key_value("bridge_speed", new ConfigOptionFloatsNullable(1, speed));
+        obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
+        obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
+        obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
+
+        if (obj->instances.empty())
+            obj->add_instance();
+        obj->instances[0]->set_offset(plate_origin + Vec3d(0.0, i * row_spacing, 0.0));
+        obj->ensure_on_bed();
+
+        const size_t obj_idx = model().objects.size() - 1;
+        object_idxs.emplace_back(obj_idx);
+        get_partplate_list().add_to_plate(obj_idx, 0, 0);
+        sidebar().obj_list()->add_object_to_list(obj_idx);
+    }
+
+    changed_objects(object_idxs);
+    arrange();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
 
     p->background_process.fff_print()->set_calib_params(params);
 }
