@@ -3619,6 +3619,13 @@ void MainFrame::init_menubar_as_editor()
             dlg->Destroy();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
     m_topbar->GetCalibMenu()->AppendSeparator();
     m_topbar->GetCalibMenu()->AppendSubMenu(custom_calib_menu, _L("3le Calibration"));
 
@@ -3784,6 +3791,13 @@ void MainFrame::init_menubar_as_editor()
     append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Flow"), _L("Bridge Flow"),
         [this](wxCommandEvent&) {
             auto dlg = new BridgeFlow_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         }, "", nullptr,

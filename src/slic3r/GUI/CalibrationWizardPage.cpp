@@ -37,6 +37,8 @@ wxString get_cali_mode_caption_string(CalibMode mode)
         return _L("Bridge Speed Calibration");
     if (mode == CalibMode::Calib_Bridge_Flow)
         return _L("Bridge Flow Calibration");
+    if (mode == CalibMode::Calib_Bridge_Density)
+        return _L("Bridge Density Calibration");
     return "no cali_mode_caption";
 }
 
@@ -61,6 +63,8 @@ wxString get_calibration_wiki_page(CalibMode cali_mode)
     case CalibMode::Calib_Bridge_Speed:
         return "";
     case CalibMode::Calib_Bridge_Flow:
+        return "";
+    case CalibMode::Calib_Bridge_Density:
         return "";
     case CalibMode::Calib_Retraction_tower:
         return wxString::Format("https://wiki.bambulab.com/%s/software/bambu-studio/calibration_retraction", region);

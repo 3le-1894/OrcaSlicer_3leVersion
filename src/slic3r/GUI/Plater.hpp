@@ -373,6 +373,7 @@ public:
     void calib_fan_speed(const Calib_Params& params);
     void calib_bridge_speed(const Calib_Params& params);
     void calib_bridge_flow(const Calib_Params& params);
+    void calib_bridge_density(const Calib_Params& params);
     void calib_input_shaping_freq(const Calib_Params& params);
     void calib_input_shaping_damp(const Calib_Params& params);
     void Calib_Cornering(const Calib_Params& params);
