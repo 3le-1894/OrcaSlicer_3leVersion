@@ -16527,6 +16527,68 @@ void Plater::calib_bridge_speed(const Calib_Params& params)
     p->background_process.fff_print()->set_calib_params(params);
 }
 
+void Plater::calib_bridge_flow(const Calib_Params& params)
+{
+    const auto calib_bridge_flow_name = wxString::Format(L"Bridge flow test");
+    new_project(false, false, calib_bridge_flow_name);
+    wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
+    if (params.mode != CalibMode::Calib_Bridge_Flow)
+        return;
+
+    std::vector<double> flow_ratios;
+    for (double flow_ratio = params.start; flow_ratio <= params.end + 0.0001; flow_ratio += params.step)
+        flow_ratios.emplace_back(flow_ratio);
+    if (flow_ratios.empty())
+        return;
+
+    auto print_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    auto printer_config = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
+
+    printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
+    print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
+    print_config->set_key_value("enable_support", new ConfigOptionBool(false));
+    print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
+    print_config->set_key_value("top_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(0));
+    print_config->set_key_value("detect_thin_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("spiral_mode", new ConfigOptionBool(false));
+    print_config->set_key_value("enable_wrapping_detection", new ConfigOptionBool(false));
+    print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
+
+    std::vector<size_t> object_idxs;
+    object_idxs.reserve(flow_ratios.size());
+    for (double flow_ratio : flow_ratios) {
+        std::string name = into_u8(wxString::Format("Bridge Flow %.2f", flow_ratio));
+
+        ModelObject* obj = model().add_object(name.c_str(), "", bridge_calib_make_speed_group_mesh());
+        obj->name = name;
+        obj->config.set_key_value("bridge_speed", new ConfigOptionFloatsNullable(1, params.bridge_speed));
+        obj->config.set_key_value("bridge_flow", new ConfigOptionFloat(flow_ratio));
+        obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
+        obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
+        obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
+
+        if (obj->instances.empty())
+            obj->add_instance();
+        obj->ensure_on_bed();
+
+        const size_t obj_idx = model().objects.size() - 1;
+        object_idxs.emplace_back(obj_idx);
+        get_partplate_list().add_to_plate(obj_idx, 0, 0);
+        sidebar().obj_list()->add_object_to_list(obj_idx);
+    }
+
+    changed_objects(object_idxs);
+    arrange();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
+
+    p->background_process.fff_print()->set_calib_params(params);
+}
+
 void Plater::calib_input_shaping_freq(const Calib_Params& params)
 {
     const auto calib_input_shaping_name = wxString::Format(L"Input shaping Frequency test");
