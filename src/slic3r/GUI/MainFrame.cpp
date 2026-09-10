@@ -3523,6 +3523,11 @@ void MainFrame::init_menubar_as_editor()
             m_vol_test_dlg->ShowModal();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("MVS Speed Limit"), _L("MVS Speed Limit"),
+        [this](wxCommandEvent&) {
+            calculate_mvs_safe_speeds();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
 
     // Pressure Advance
     append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Pressure advance"), _L("Pressure advance"),
@@ -3600,11 +3605,6 @@ void MainFrame::init_menubar_as_editor()
             dlg->Destroy();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Calculate MVS safe speeds"), _L("Calculate MVS safe speeds"),
-        [this](wxCommandEvent&) {
-            calculate_mvs_safe_speeds();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
     m_topbar->GetCalibMenu()->AppendSeparator();
     m_topbar->GetCalibMenu()->AppendSubMenu(custom_calib_menu, _L("3le Calibration"));
 
@@ -3675,6 +3675,11 @@ void MainFrame::init_menubar_as_editor()
             if (!m_vol_test_dlg)
                 m_vol_test_dlg = new MaxVolumetricSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             m_vol_test_dlg->ShowModal();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(calib_menu, wxID_ANY, _L("MVS Speed Limit"), _L("MVS Speed Limit"),
+        [this](wxCommandEvent&) {
+            calculate_mvs_safe_speeds();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
@@ -3753,11 +3758,6 @@ void MainFrame::init_menubar_as_editor()
             auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Calculate MVS safe speeds"), _L("Calculate MVS safe speeds"),
-        [this](wxCommandEvent&) {
-            calculate_mvs_safe_speeds();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
     calib_menu->AppendSeparator();
