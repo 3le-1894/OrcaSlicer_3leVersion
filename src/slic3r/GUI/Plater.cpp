@@ -16369,7 +16369,7 @@ void Plater::calib_VFA(const Calib_Params& params)
 
 void Plater::calib_fan_speed(const Calib_Params& params)
 {
-    const auto calib_fan_speed_name = wxString::Format(L"Fan speed test");
+    const auto calib_fan_speed_name = wxString::Format(L"Fan Speed Test");
     new_project(false, false, calib_fan_speed_name);
     wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
     if (params.mode != CalibMode::Calib_Fan_Speed_Tower)

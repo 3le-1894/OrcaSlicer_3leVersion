@@ -3556,6 +3556,13 @@ void MainFrame::init_menubar_as_editor()
             m_retraction_calib_dlg->ShowModal();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Fan Speed"), _L("Fan Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
 
     // Cornering
     append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Cornering"), _L("Cornering calibration"),
@@ -3628,16 +3635,7 @@ void MainFrame::init_menubar_as_editor()
         [this]() {return m_plater->is_view3D_shown();; }, this);
     m_topbar->GetCalibMenu()->AppendSubMenu(bridging_menu, _L("Bridging"));
 
-    auto custom_calib_menu = new wxMenu();
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Fan speed"), _L("Fan speed"),
-        [this](wxCommandEvent&) {
-            auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
     m_topbar->GetCalibMenu()->AppendSeparator();
-    m_topbar->GetCalibMenu()->AppendSubMenu(custom_calib_menu, _L("3le Calibration"));
 
     // help
     append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Calibration Guide"), _L("Calibration Guide"), [](wxCommandEvent &)
@@ -3742,6 +3740,13 @@ void MainFrame::init_menubar_as_editor()
             m_retraction_calib_dlg->ShowModal();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(calib_menu, wxID_ANY, _L("Fan Speed"), _L("Fan Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
 
     // Cornering
     append_menu_item(calib_menu, wxID_ANY, _L("Cornering"), _L("Cornering calibration"),
@@ -3814,16 +3819,7 @@ void MainFrame::init_menubar_as_editor()
         [this]() {return m_plater->is_view3D_shown();; }, this);
     calib_menu->AppendSubMenu(bridging_menu, _L("Bridging"));
 
-    auto custom_calib_menu = new wxMenu();
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Fan speed"), _L("Fan speed"),
-        [this](wxCommandEvent&) {
-            auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
     calib_menu->AppendSeparator();
-    calib_menu->AppendSubMenu(custom_calib_menu, _L("3le Calibration"));
 
     // help
     append_menu_item(calib_menu, wxID_ANY, _L("Calibration Guide"), _L("Calibration Guide"),
