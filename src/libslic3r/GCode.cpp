@@ -5659,7 +5659,8 @@ LayerResult GCode::process_layer(
             m_calib_config.set_key_value("outer_wall_speed", new ConfigOptionFloatsNullable({std::round(_speed)}));
             break;
         }
-        case CalibMode::Calib_Fan_Speed_Tower: {
+        case CalibMode::Calib_Fan_Speed_Tower:
+        case CalibMode::Calib_Bridge_Cooling: {
             const float fan_speed = std::clamp(this->interpolate_value_across_layers(static_cast<float>(print.calib_params().start),
                                                                                      static_cast<float>(print.calib_params().end),
                                                                                      static_cast<float>(print.calib_params().step)),

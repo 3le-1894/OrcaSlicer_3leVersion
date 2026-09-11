@@ -1383,6 +1383,163 @@ void BridgeDensity_Test_Dlg::on_dpi_changed(const wxRect& suggested_rect)
 }
 
 
+// BridgeCooling_Test_Dlg
+//
+
+BridgeCooling_Test_Dlg::BridgeCooling_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater)
+    : DPIDialog(parent, id, _L("Bridge cooling test"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+    , m_plater(plater)
+{
+    SetBackgroundColour(*wxWHITE);
+    SetForegroundColour(wxColour("#363636"));
+    SetFont(Label::Body_14);
+
+    wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
+    SetSizer(v_sizer);
+
+    double bridge_speed = 25.0;
+    double bridge_flow = 1.0;
+    double bridge_density = 100.0;
+    if (wxGetApp().preset_bundle != nullptr) {
+        auto print_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        const auto* bridge_speed_opt = print_config->option<ConfigOptionFloatsNullable>("bridge_speed");
+        bridge_speed = bridge_speed_opt != nullptr ? bridge_speed_opt->get_at(0) : 25.0;
+        if (bridge_speed <= 0.0)
+            bridge_speed = 25.0;
+
+        const auto* bridge_flow_opt = print_config->option<ConfigOptionFloat>("bridge_flow");
+        bridge_flow = bridge_flow_opt != nullptr ? bridge_flow_opt->value : 1.0;
+        if (bridge_flow <= 0.0)
+            bridge_flow = 1.0;
+
+        const auto* bridge_density_opt = print_config->option<ConfigOptionPercent>("bridge_density");
+        bridge_density = bridge_density_opt != nullptr ? bridge_density_opt->value : 100.0;
+        if (bridge_density < 10.0 || bridge_density > 125.0)
+            bridge_density = 100.0;
+    }
+
+    wxString bridge_speed_str   = _L("Bridge speed: ");
+    wxString bridge_flow_str    = _L("Bridge flow: ");
+    wxString bridge_density_str = _L("Bridge density: ");
+    wxString start_str          = _L("Start fan speed: ");
+    wxString end_str            = _L("End fan speed: ");
+    wxString step_str           = _L("Step") + ": ";
+    int text_max = GetTextMax(this, std::vector<wxString>{bridge_speed_str, bridge_flow_str, bridge_density_str, start_str, end_str, step_str});
+
+    auto st_size = wxSize(text_max, -1);
+    auto ti_size = FromDIP(wxSize(120, -1));
+
+    LabeledStaticBox* stb = new LabeledStaticBox(this, _L("Settings"));
+    wxStaticBoxSizer* settings_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
+
+    settings_sizer->AddSpacer(FromDIP(5));
+
+    auto bridge_speed_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto bridge_speed_text = new wxStaticText(this, wxID_ANY, bridge_speed_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiBridgeSpeed = new TextInput(this, wxString::FromDouble(bridge_speed), _L("mm/s"), "", wxDefaultPosition, ti_size);
+    m_tiBridgeSpeed->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    bridge_speed_sizer->Add(bridge_speed_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    bridge_speed_sizer->Add(m_tiBridgeSpeed, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(bridge_speed_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto bridge_flow_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto bridge_flow_text = new wxStaticText(this, wxID_ANY, bridge_flow_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiBridgeFlow = new TextInput(this, wxString::FromDouble(bridge_flow), "", "", wxDefaultPosition, ti_size);
+    m_tiBridgeFlow->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    bridge_flow_sizer->Add(bridge_flow_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    bridge_flow_sizer->Add(m_tiBridgeFlow, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(bridge_flow_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto bridge_density_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto bridge_density_text = new wxStaticText(this, wxID_ANY, bridge_density_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiBridgeDensity = new TextInput(this, wxString::FromDouble(bridge_density), _L("%"), "", wxDefaultPosition, ti_size);
+    m_tiBridgeDensity->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    bridge_density_sizer->Add(bridge_density_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    bridge_density_sizer->Add(m_tiBridgeDensity, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(bridge_density_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto start_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto start_text = new wxStaticText(this, wxID_ANY, start_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiStart = new TextInput(this, wxString::FromDouble(20), _L("%"), "", wxDefaultPosition, ti_size);
+    m_tiStart->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    start_sizer->Add(start_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    start_sizer->Add(m_tiStart, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(start_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto end_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto end_text = new wxStaticText(this, wxID_ANY, end_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiEnd = new TextInput(this, wxString::FromDouble(100), _L("%"), "", wxDefaultPosition, ti_size);
+    m_tiEnd->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    end_sizer->Add(end_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    end_sizer->Add(m_tiEnd, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(end_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto step_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto step_text = new wxStaticText(this, wxID_ANY, step_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiStep = new TextInput(this, wxString::FromDouble(10), _L("%"), "", wxDefaultPosition, ti_size);
+    m_tiStep->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    step_sizer->Add(step_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    step_sizer->Add(m_tiStep, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(step_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto info_text = new wxStaticText(this, wxID_ANY,
+        _L("Creates a vertical bridge tower. Fan speed changes by height while bridge speed, flow, and density stay fixed."),
+        wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+    info_text->Wrap(FromDIP(360));
+    settings_sizer->Add(info_text, 0, wxALL | wxEXPAND, FromDIP(5));
+
+    settings_sizer->AddSpacer(FromDIP(5));
+
+    v_sizer->Add(settings_sizer, 0, wxTOP | wxRIGHT | wxLEFT | wxEXPAND, FromDIP(10));
+    v_sizer->AddSpacer(FromDIP(5));
+
+    auto dlg_btns = new DialogButtons(this, {"OK"});
+    auto bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
+    bottom_sizer->AddStretchSpacer();
+    bottom_sizer->Add(dlg_btns, 0, wxEXPAND);
+    v_sizer->Add(bottom_sizer, 0, wxEXPAND);
+
+    dlg_btns->GetOK()->Bind(wxEVT_BUTTON, &BridgeCooling_Test_Dlg::on_start, this);
+
+    wxGetApp().UpdateDlgDarkUI(this);
+
+    Layout();
+    Fit();
+    v_sizer->SetSizeHints(this);
+}
+
+BridgeCooling_Test_Dlg::~BridgeCooling_Test_Dlg()
+{
+}
+
+void BridgeCooling_Test_Dlg::on_start(wxCommandEvent& event)
+{
+    bool read_double = false;
+    read_double = m_tiBridgeSpeed->GetTextCtrl()->GetValue().ToDouble(&m_params.bridge_speed);
+    read_double = read_double && m_tiBridgeFlow->GetTextCtrl()->GetValue().ToDouble(&m_params.bridge_flow);
+    read_double = read_double && m_tiBridgeDensity->GetTextCtrl()->GetValue().ToDouble(&m_params.bridge_density);
+    read_double = read_double && m_tiStart->GetTextCtrl()->GetValue().ToDouble(&m_params.start);
+    read_double = read_double && m_tiEnd->GetTextCtrl()->GetValue().ToDouble(&m_params.end);
+    read_double = read_double && m_tiStep->GetTextCtrl()->GetValue().ToDouble(&m_params.step);
+
+    if (!read_double || m_params.bridge_speed <= 0 || m_params.bridge_flow <= 0 || m_params.bridge_density < 10 || m_params.bridge_density > 125 || m_params.start < 0 || m_params.end > 100 || m_params.step <= 0 || m_params.end < (m_params.start + m_params.step)) {
+        MessageDialog msg_dlg(nullptr, _L("Please input valid values:\nbridge speed > 0\nbridge flow > 0\n10 <= bridge density <= 125\n0 <= fan speed <= 100\nstep > 0\nend fan speed >= start fan speed + step"), wxEmptyString, wxICON_WARNING | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    m_params.mode = CalibMode::Calib_Bridge_Cooling;
+    m_plater->calib_bridge_cooling(m_params);
+    EndModal(wxID_OK);
+}
+
+void BridgeCooling_Test_Dlg::on_dpi_changed(const wxRect& suggested_rect)
+{
+    this->Refresh();
+    Fit();
+}
+
+
 
 // Retraction_Test_Dlg
 //

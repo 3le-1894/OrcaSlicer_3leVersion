@@ -16460,6 +16460,36 @@ static TriangleMesh bridge_calib_make_speed_group_mesh()
     return TriangleMesh(std::move(mesh));
 }
 
+static TriangleMesh bridge_calib_make_cooling_tower_mesh(size_t level_count)
+{
+    static constexpr double support_width  = 6.0;
+    static constexpr double support_depth  = 10.0;
+    static constexpr double support_height = 6.0;
+    static constexpr double bridge_height  = 1.2;
+    static constexpr double coupon_gap     = 8.0;
+    static constexpr double level_pitch    = 8.0;
+    const std::array<double, 3> spans = { 10.0, 20.0, 30.0 };
+
+    indexed_triangle_set mesh;
+    const double tower_height = support_height + std::max<size_t>(level_count, 1) * level_pitch;
+    double x = 0.0;
+    for (double span : spans) {
+        const double coupon_width = support_width * 2.0 + span;
+
+        its_merge(mesh, bridge_calib_make_box(x, 0.0, 0.0, support_width, support_depth, tower_height));
+        its_merge(mesh, bridge_calib_make_box(x + support_width + span, 0.0, 0.0, support_width, support_depth, tower_height));
+
+        for (size_t level_idx = 0; level_idx < level_count; ++level_idx) {
+            const double bridge_z = support_height + level_idx * level_pitch;
+            its_merge(mesh, bridge_calib_make_box(x, 0.0, bridge_z, coupon_width, support_depth, bridge_height));
+        }
+
+        x += coupon_width + coupon_gap;
+    }
+
+    return TriangleMesh(std::move(mesh));
+}
+
 void Plater::calib_bridge_speed(const Calib_Params& params)
 {
     const auto calib_bridge_speed_name = wxString::Format(L"Bridge speed test");
@@ -16647,6 +16677,65 @@ void Plater::calib_bridge_density(const Calib_Params& params)
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
+
+    p->background_process.fff_print()->set_calib_params(params);
+}
+
+void Plater::calib_bridge_cooling(const Calib_Params& params)
+{
+    const auto calib_bridge_cooling_name = wxString::Format(L"Bridge cooling test");
+    new_project(false, false, calib_bridge_cooling_name);
+    wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
+    if (params.mode != CalibMode::Calib_Bridge_Cooling)
+        return;
+
+    const int level_count = std::max(1, static_cast<int>(std::lround(std::abs(params.end - params.start) / params.step)) + 1);
+
+    auto print_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
+    auto printer_config = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
+
+    printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
+    filament_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats { 0.0 });
+    filament_config->set_key_value("slow_down_min_speed", new ConfigOptionFloats { 0.0 });
+    filament_config->set_key_value("slow_down_for_layer_cooling", new ConfigOptionBools{false});
+    filament_config->set_key_value("enable_overhang_bridge_fan", new ConfigOptionBools{false});
+    filament_config->set_key_value("close_fan_the_first_x_layers", new ConfigOptionInts{0});
+    print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
+    print_config->set_key_value("enable_support", new ConfigOptionBool(false));
+    print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
+    print_config->set_key_value("top_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(0));
+    print_config->set_key_value("detect_thin_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("spiral_mode", new ConfigOptionBool(false));
+    print_config->set_key_value("enable_wrapping_detection", new ConfigOptionBool(false));
+    print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
+
+    std::string name = "Bridge Cooling";
+    ModelObject* obj = model().add_object(name.c_str(), "", bridge_calib_make_cooling_tower_mesh(static_cast<size_t>(level_count)));
+    obj->name = name;
+    obj->config.set_key_value("bridge_speed", new ConfigOptionFloatsNullable(1, params.bridge_speed));
+    obj->config.set_key_value("bridge_flow", new ConfigOptionFloat(params.bridge_flow));
+    obj->config.set_key_value("bridge_density", new ConfigOptionPercent(params.bridge_density));
+    obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
+    obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
+    obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
+    if (obj->instances.empty())
+        obj->add_instance();
+    obj->ensure_on_bed();
+
+    const size_t obj_idx = model().objects.size() - 1;
+    get_partplate_list().add_to_plate(obj_idx, 0, 0);
+    sidebar().obj_list()->add_object_to_list(obj_idx);
+
+    changed_objects({ obj_idx });
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->reload_config();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
 
     p->background_process.fff_print()->set_calib_params(params);

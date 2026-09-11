@@ -3597,31 +3597,41 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
-    auto custom_calib_menu = new wxMenu();
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Fan speed"), _L("Fan speed"),
-        [this](wxCommandEvent&) {
-            auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
+    auto bridging_menu = new wxMenu();
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
         [this](wxCommandEvent&) {
             auto dlg = new BridgeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Flow"), _L("Bridge Flow"),
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Flow"), _L("Bridge Flow"),
         [this](wxCommandEvent&) {
             auto dlg = new BridgeFlow_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
         [this](wxCommandEvent&) {
             auto dlg = new BridgeDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Cooling"), _L("Bridge Cooling"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeCooling_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    m_topbar->GetCalibMenu()->AppendSubMenu(bridging_menu, _L("Bridging"));
+
+    auto custom_calib_menu = new wxMenu();
+    append_menu_item(custom_calib_menu, wxID_ANY, _L("Fan speed"), _L("Fan speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         }, "", nullptr,
@@ -3773,31 +3783,41 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
-    auto custom_calib_menu = new wxMenu();
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Fan speed"), _L("Fan speed"),
-        [this](wxCommandEvent&) {
-            auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
+    auto bridging_menu = new wxMenu();
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
         [this](wxCommandEvent&) {
             auto dlg = new BridgeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Flow"), _L("Bridge Flow"),
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Flow"), _L("Bridge Flow"),
         [this](wxCommandEvent&) {
             auto dlg = new BridgeFlow_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(custom_calib_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
         [this](wxCommandEvent&) {
             auto dlg = new BridgeDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Cooling"), _L("Bridge Cooling"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeCooling_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    calib_menu->AppendSubMenu(bridging_menu, _L("Bridging"));
+
+    auto custom_calib_menu = new wxMenu();
+    append_menu_item(custom_calib_menu, wxID_ANY, _L("Fan speed"), _L("Fan speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         }, "", nullptr,
