@@ -1011,6 +1011,228 @@ void FanSpeed_Test_Dlg::on_dpi_changed(const wxRect& suggested_rect)
     Fit();
 }
 
+// ScarfJointSpeed_Test_Dlg
+//
+
+ScarfJointSpeed_Test_Dlg::ScarfJointSpeed_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater)
+    : DPIDialog(parent, id, _L("Scarf Joint Speed Test"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+    , m_plater(plater)
+{
+    SetBackgroundColour(*wxWHITE);
+    SetForegroundColour(wxColour("#363636"));
+    SetFont(Label::Body_14);
+
+    wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
+    SetSizer(v_sizer);
+
+    wxString start_str = _L("Start scarf speed: ");
+    wxString end_str   = _L("End scarf speed: ");
+    wxString step_str  = _L("Step") + ": ";
+    int text_max = GetTextMax(this, std::vector<wxString>{start_str, end_str, step_str});
+
+    auto st_size = wxSize(text_max, -1);
+    auto ti_size = FromDIP(wxSize(120, -1));
+
+    LabeledStaticBox* stb = new LabeledStaticBox(this, _L("Settings"));
+    wxStaticBoxSizer* settings_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
+
+    settings_sizer->AddSpacer(FromDIP(5));
+
+    auto start_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto start_text = new wxStaticText(this, wxID_ANY, start_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiStart = new TextInput(this, std::to_string(20), _L("mm/s"), "", wxDefaultPosition, ti_size);
+    m_tiStart->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    start_sizer->Add(start_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    start_sizer->Add(m_tiStart, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(start_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto end_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto end_text = new wxStaticText(this, wxID_ANY, end_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiEnd = new TextInput(this, std::to_string(80), _L("mm/s"), "", wxDefaultPosition, ti_size);
+    m_tiEnd->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    end_sizer->Add(end_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    end_sizer->Add(m_tiEnd, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(end_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto step_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto step_text = new wxStaticText(this, wxID_ANY, step_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiStep = new TextInput(this, wxString::FromDouble(10), _L("mm/s"), "", wxDefaultPosition, ti_size);
+    m_tiStep->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    step_sizer->Add(step_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    step_sizer->Add(m_tiStep, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(step_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto info_text = new wxStaticText(this, wxID_ANY,
+        _L("Creates a stacked cylindrical scarf seam tower with one section per scarf joint speed. Inspect the seam side and choose the fastest speed that keeps the scarf transition smooth and hidden."),
+        wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+    info_text->Wrap(FromDIP(390));
+    settings_sizer->Add(info_text, 0, wxALL | wxEXPAND, FromDIP(5));
+
+    settings_sizer->AddSpacer(FromDIP(5));
+
+    v_sizer->Add(settings_sizer, 0, wxTOP | wxRIGHT | wxLEFT | wxEXPAND, FromDIP(10));
+    v_sizer->AddSpacer(FromDIP(5));
+
+    auto dlg_btns = new DialogButtons(this, {"OK"});
+    auto bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
+    bottom_sizer->AddStretchSpacer();
+    bottom_sizer->Add(dlg_btns, 0, wxEXPAND);
+    v_sizer->Add(bottom_sizer, 0, wxEXPAND);
+
+    dlg_btns->GetOK()->Bind(wxEVT_BUTTON, &ScarfJointSpeed_Test_Dlg::on_start, this);
+
+    wxGetApp().UpdateDlgDarkUI(this);
+
+    Layout();
+    Fit();
+    v_sizer->SetSizeHints(this);
+}
+
+ScarfJointSpeed_Test_Dlg::~ScarfJointSpeed_Test_Dlg()
+{
+}
+
+void ScarfJointSpeed_Test_Dlg::on_start(wxCommandEvent& event)
+{
+    bool read_double = false;
+    read_double = m_tiStart->GetTextCtrl()->GetValue().ToDouble(&m_params.start);
+    read_double = read_double && m_tiEnd->GetTextCtrl()->GetValue().ToDouble(&m_params.end);
+    read_double = read_double && m_tiStep->GetTextCtrl()->GetValue().ToDouble(&m_params.step);
+
+    if (!read_double || m_params.start <= 0 || m_params.step <= 0 || m_params.end < (m_params.start + m_params.step)) {
+        MessageDialog msg_dlg(nullptr, _L("Please input valid values:\nstart scarf speed > 0\nstep > 0\nend scarf speed >= start scarf speed + step"), wxEmptyString, wxICON_WARNING | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    m_params.mode = CalibMode::Calib_Scarf_Joint_Speed;
+    m_plater->calib_scarf_joint_speed(m_params);
+    EndModal(wxID_OK);
+}
+
+void ScarfJointSpeed_Test_Dlg::on_dpi_changed(const wxRect& suggested_rect)
+{
+    this->Refresh();
+    Fit();
+}
+
+// ScarfLengthSteps_Test_Dlg
+//
+
+ScarfLengthSteps_Test_Dlg::ScarfLengthSteps_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater)
+    : DPIDialog(parent, id, _L("Scarf Length / Steps Test"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+    , m_plater(plater)
+{
+    SetBackgroundColour(*wxWHITE);
+    SetForegroundColour(wxColour("#363636"));
+    SetFont(Label::Body_14);
+
+    wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
+    SetSizer(v_sizer);
+
+    wxString steps_str = _L("Scarf steps: ");
+    wxString start_str = _L("Start scarf length: ");
+    wxString end_str   = _L("End scarf length: ");
+    wxString step_str  = _L("Step") + ": ";
+    int text_max = GetTextMax(this, std::vector<wxString>{steps_str, start_str, end_str, step_str});
+
+    auto st_size = wxSize(text_max, -1);
+    auto ti_size = FromDIP(wxSize(120, -1));
+
+    LabeledStaticBox* stb = new LabeledStaticBox(this, _L("Settings"));
+    wxStaticBoxSizer* settings_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
+
+    settings_sizer->AddSpacer(FromDIP(5));
+
+    auto steps_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto steps_text = new wxStaticText(this, wxID_ANY, steps_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiScarfSteps = new TextInput(this, std::to_string(10), "", "", wxDefaultPosition, ti_size);
+    m_tiScarfSteps->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    steps_sizer->Add(steps_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    steps_sizer->Add(m_tiScarfSteps, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(steps_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto start_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto start_text = new wxStaticText(this, wxID_ANY, start_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiStart = new TextInput(this, std::to_string(10), _L("mm"), "", wxDefaultPosition, ti_size);
+    m_tiStart->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    start_sizer->Add(start_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    start_sizer->Add(m_tiStart, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(start_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto end_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto end_text = new wxStaticText(this, wxID_ANY, end_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiEnd = new TextInput(this, std::to_string(40), _L("mm"), "", wxDefaultPosition, ti_size);
+    m_tiEnd->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    end_sizer->Add(end_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    end_sizer->Add(m_tiEnd, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(end_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto step_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto step_text = new wxStaticText(this, wxID_ANY, step_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiStep = new TextInput(this, wxString::FromDouble(5), _L("mm"), "", wxDefaultPosition, ti_size);
+    m_tiStep->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    step_sizer->Add(step_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    step_sizer->Add(m_tiStep, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(step_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto info_text = new wxStaticText(this, wxID_ANY,
+        _L("Creates a stacked cylindrical scarf seam tower with one section per scarf length. Scarf steps are held constant so length is the only swept variable."),
+        wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+    info_text->Wrap(FromDIP(390));
+    settings_sizer->Add(info_text, 0, wxALL | wxEXPAND, FromDIP(5));
+
+    settings_sizer->AddSpacer(FromDIP(5));
+
+    v_sizer->Add(settings_sizer, 0, wxTOP | wxRIGHT | wxLEFT | wxEXPAND, FromDIP(10));
+    v_sizer->AddSpacer(FromDIP(5));
+
+    auto dlg_btns = new DialogButtons(this, {"OK"});
+    auto bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
+    bottom_sizer->AddStretchSpacer();
+    bottom_sizer->Add(dlg_btns, 0, wxEXPAND);
+    v_sizer->Add(bottom_sizer, 0, wxEXPAND);
+
+    dlg_btns->GetOK()->Bind(wxEVT_BUTTON, &ScarfLengthSteps_Test_Dlg::on_start, this);
+
+    wxGetApp().UpdateDlgDarkUI(this);
+
+    Layout();
+    Fit();
+    v_sizer->SetSizeHints(this);
+}
+
+ScarfLengthSteps_Test_Dlg::~ScarfLengthSteps_Test_Dlg()
+{
+}
+
+void ScarfLengthSteps_Test_Dlg::on_start(wxCommandEvent& event)
+{
+    long scarf_steps = 0;
+    bool read_double = false;
+    read_double = m_tiStart->GetTextCtrl()->GetValue().ToDouble(&m_params.start);
+    read_double = read_double && m_tiEnd->GetTextCtrl()->GetValue().ToDouble(&m_params.end);
+    read_double = read_double && m_tiStep->GetTextCtrl()->GetValue().ToDouble(&m_params.step);
+    bool read_steps = m_tiScarfSteps->GetTextCtrl()->GetValue().ToLong(&scarf_steps);
+
+    if (!read_double || !read_steps || scarf_steps < 1 || m_params.start > 0 && m_params.start < 1 || m_params.step <= 0 || m_params.end < (m_params.start + m_params.step)) {
+        MessageDialog msg_dlg(nullptr, _L("Please input valid values:\nscarf steps >= 1\nstart scarf length = 0 or >= 1 mm\nstep > 0\nend scarf length >= start scarf length + step"), wxEmptyString, wxICON_WARNING | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    m_params.scarf_steps = static_cast<int>(scarf_steps);
+    m_params.mode = CalibMode::Calib_Scarf_Length_Steps;
+    m_plater->calib_scarf_length_steps(m_params);
+    EndModal(wxID_OK);
+}
+
+void ScarfLengthSteps_Test_Dlg::on_dpi_changed(const wxRect& suggested_rect)
+{
+    this->Refresh();
+    Fit();
+}
+
 // BridgeSpeed_Test_Dlg
 //
 

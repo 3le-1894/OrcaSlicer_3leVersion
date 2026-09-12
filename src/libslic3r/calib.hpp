@@ -28,6 +28,8 @@ enum class CalibMode : int {
     Calib_Bridge_Flow,
     Calib_Bridge_Density,
     Calib_Bridge_Cooling,
+    Calib_Scarf_Joint_Speed,
+    Calib_Scarf_Length_Steps,
     Calib_Retraction_tower,
     Calib_Input_shaping_freq,
     Calib_Input_shaping_damp,
@@ -47,6 +49,7 @@ struct Calib_Params
     double bridge_speed = 0.0;
     double bridge_flow = 0.0;
     double bridge_density = 0.0;
+    int scarf_steps = 10;
     std::string shaper_type;
     std::vector<double> accelerations;
     std::vector<double> speeds;

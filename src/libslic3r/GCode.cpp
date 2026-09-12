@@ -5670,6 +5670,25 @@ LayerResult GCode::process_layer(
             gcode += writer().set_fan(static_cast<unsigned int>(std::round(fan_speed)));
             break;
         }
+        case CalibMode::Calib_Scarf_Joint_Speed: {
+            const float scarf_speed = std::max(1.0f, this->interpolate_value_across_layers(static_cast<float>(print.calib_params().start),
+                                                                                           static_cast<float>(print.calib_params().end),
+                                                                                           static_cast<float>(print.calib_params().step)));
+            sprintf(buf, "; Calib_Scarf_Joint_Speed: Z_HEIGHT: %g, scarf_joint_speed:%g mm/s\n", print_z, scarf_speed);
+            gcode += buf;
+            m_calib_config.set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(std::round(scarf_speed), false));
+            break;
+        }
+        case CalibMode::Calib_Scarf_Length_Steps: {
+            const float scarf_length = std::max(0.0f, this->interpolate_value_across_layers(static_cast<float>(print.calib_params().start),
+                                                                                           static_cast<float>(print.calib_params().end),
+                                                                                           static_cast<float>(print.calib_params().step)));
+            sprintf(buf, "; Calib_Scarf_Length_Steps: Z_HEIGHT: %g, scarf_length:%g mm, scarf_steps:%d\n", print_z, scarf_length, print.calib_params().scarf_steps);
+            gcode += buf;
+            m_calib_config.set_key_value("seam_slope_min_length", new ConfigOptionFloat(scarf_length));
+            m_calib_config.set_key_value("seam_slope_steps", new ConfigOptionInt(print.calib_params().scarf_steps));
+            break;
+        }
         case CalibMode::Calib_Vol_speed_Tower: {
             auto _speed = print.calib_params().start + print_z * print.calib_params().step;
             m_calib_config.set_key_value("outer_wall_speed", new ConfigOptionFloatsNullable({std::round(_speed)}));

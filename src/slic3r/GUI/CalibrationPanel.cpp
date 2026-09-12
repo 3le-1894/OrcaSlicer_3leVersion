@@ -40,6 +40,10 @@ wxString get_calibration_type_name(CalibMode cali_mode)
         return _L("Bridge Density");
     case CalibMode::Calib_Bridge_Cooling:
         return _L("Bridge Cooling");
+    case CalibMode::Calib_Scarf_Joint_Speed:
+        return _L("Scarf Joint Speed");
+    case CalibMode::Calib_Scarf_Length_Steps:
+        return _L("Scarf Length / Steps");
     case CalibMode::Calib_Retraction_tower:
         return _L("Retraction");
     default:

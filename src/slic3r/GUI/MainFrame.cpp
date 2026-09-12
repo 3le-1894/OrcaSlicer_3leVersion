@@ -3515,19 +3515,20 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
-    // Max Volumetric Speed
-    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Max flowrate"), _L("Max flowrate"),
+    auto volumetric_flow_menu = new wxMenu();
+    append_menu_item(volumetric_flow_menu, wxID_ANY, _L("Max flowrate"), _L("Max flowrate"),
         [this](wxCommandEvent&) {
             if (!m_vol_test_dlg)
                 m_vol_test_dlg = new MaxVolumetricSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             m_vol_test_dlg->ShowModal();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("MVS Speed Limit"), _L("MVS Speed Limit"),
+    append_menu_item(volumetric_flow_menu, wxID_ANY, _L("MVS Speed Limit"), _L("MVS Speed Limit"),
         [this](wxCommandEvent&) {
             calculate_mvs_safe_speeds();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+    m_topbar->GetCalibMenu()->AppendSubMenu(volumetric_flow_menu, _L("Volumetric Flow"));
 
     // Pressure Advance
     append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Pressure advance"), _L("Pressure advance"),
@@ -3548,6 +3549,8 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
+    m_topbar->GetCalibMenu()->AppendSeparator();
+
     // Retraction
     append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Retraction"), _L("Retraction"),
         [this](wxCommandEvent&) {
@@ -3561,6 +3564,74 @@ void MainFrame::init_menubar_as_editor()
             auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+
+    auto scarf_seam_menu = new wxMenu();
+    auto show_scarf_placeholder = [this](const wxString& name) {
+        MessageDialog msg(this,
+            wxString::Format(_L("%s calibration is a placeholder for future scarf seam tuning."), name),
+            _L("Scarf Seam Tuning"), wxOK | wxICON_INFORMATION);
+        msg.ShowModal();
+    };
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Joint Speed"), _L("Scarf Joint Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfJointSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Length / Steps"), _L("Scarf Length / Steps"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfLengthSteps_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Conditional Scarf Threshold"), _L("Conditional Scarf Threshold"),
+        [show_scarf_placeholder](wxCommandEvent&) { show_scarf_placeholder(_L("Conditional Scarf Threshold")); },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    m_topbar->GetCalibMenu()->AppendSubMenu(scarf_seam_menu, _L("Scarf Seam Tuning"));
+
+    auto bridging_menu = new wxMenu();
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Flow"), _L("Bridge Flow"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeFlow_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Cooling"), _L("Bridge Cooling"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeCooling_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    m_topbar->GetCalibMenu()->AppendSubMenu(bridging_menu, _L("Bridging"));
+
+    m_topbar->GetCalibMenu()->AppendSeparator();
+
+    // VFA
+    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("VFA"), _L("VFA"),
+        [this](wxCommandEvent&) {
+            if (!m_vfa_test_dlg)
+                m_vfa_test_dlg = new VFA_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            m_vfa_test_dlg->ShowModal();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
@@ -3594,46 +3665,6 @@ void MainFrame::init_menubar_as_editor()
         "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
     m_topbar->GetCalibMenu()->AppendSubMenu(input_shaping_menu, _L("Input Shaping"));
-
-    // VFA
-    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("VFA"), _L("VFA"),
-        [this](wxCommandEvent&) {
-            if (!m_vfa_test_dlg)
-                m_vfa_test_dlg = new VFA_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            m_vfa_test_dlg->ShowModal();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-
-    auto bridging_menu = new wxMenu();
-    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
-        [this](wxCommandEvent&) {
-            auto dlg = new BridgeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Flow"), _L("Bridge Flow"),
-        [this](wxCommandEvent&) {
-            auto dlg = new BridgeFlow_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
-        [this](wxCommandEvent&) {
-            auto dlg = new BridgeDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Cooling"), _L("Bridge Cooling"),
-        [this](wxCommandEvent&) {
-            auto dlg = new BridgeCooling_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    m_topbar->GetCalibMenu()->AppendSubMenu(bridging_menu, _L("Bridging"));
 
     m_topbar->GetCalibMenu()->AppendSeparator();
 
@@ -3698,19 +3729,20 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
-    // Max Volumetric Speed
-    append_menu_item(calib_menu, wxID_ANY, _L("Max flowrate"), _L("Max flowrate"),
+    auto volumetric_flow_menu = new wxMenu();
+    append_menu_item(volumetric_flow_menu, wxID_ANY, _L("Max flowrate"), _L("Max flowrate"),
         [this](wxCommandEvent&) {
             if (!m_vol_test_dlg)
                 m_vol_test_dlg = new MaxVolumetricSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             m_vol_test_dlg->ShowModal();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(calib_menu, wxID_ANY, _L("MVS Speed Limit"), _L("MVS Speed Limit"),
+    append_menu_item(volumetric_flow_menu, wxID_ANY, _L("MVS Speed Limit"), _L("MVS Speed Limit"),
         [this](wxCommandEvent&) {
             calculate_mvs_safe_speeds();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+    calib_menu->AppendSubMenu(volumetric_flow_menu, _L("Volumetric Flow"));
 
     // Pressure Advance
     append_menu_item(calib_menu, wxID_ANY, _L("Pressure advance"), _L("Pressure advance"),
@@ -3732,6 +3764,8 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
+    calib_menu->AppendSeparator();
+
     // Retraction
     append_menu_item(calib_menu, wxID_ANY, _L("Retraction"), _L("Retraction"),
         [this](wxCommandEvent&) {
@@ -3745,6 +3779,74 @@ void MainFrame::init_menubar_as_editor()
             auto dlg = new FanSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+
+    auto scarf_seam_menu = new wxMenu();
+    auto show_scarf_placeholder = [this](const wxString& name) {
+        MessageDialog msg(this,
+            wxString::Format(_L("%s calibration is a placeholder for future scarf seam tuning."), name),
+            _L("Scarf Seam Tuning"), wxOK | wxICON_INFORMATION);
+        msg.ShowModal();
+    };
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Joint Speed"), _L("Scarf Joint Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfJointSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Length / Steps"), _L("Scarf Length / Steps"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfLengthSteps_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Conditional Scarf Threshold"), _L("Conditional Scarf Threshold"),
+        [show_scarf_placeholder](wxCommandEvent&) { show_scarf_placeholder(_L("Conditional Scarf Threshold")); },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    calib_menu->AppendSubMenu(scarf_seam_menu, _L("Scarf Seam Tuning"));
+
+    auto bridging_menu = new wxMenu();
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Flow"), _L("Bridge Flow"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeFlow_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Cooling"), _L("Bridge Cooling"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeCooling_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    calib_menu->AppendSubMenu(bridging_menu, _L("Bridging"));
+
+    calib_menu->AppendSeparator();
+
+    // VFA
+    append_menu_item(calib_menu, wxID_ANY, _L("VFA"), _L("VFA"),
+        [this](wxCommandEvent&) {
+            if (!m_vfa_test_dlg)
+                m_vfa_test_dlg = new VFA_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            m_vfa_test_dlg->ShowModal();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
@@ -3778,46 +3880,6 @@ void MainFrame::init_menubar_as_editor()
         "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
     calib_menu->AppendSubMenu(input_shaping_menu, _L("Input Shaping"));
-
-    // VFA
-    append_menu_item(calib_menu, wxID_ANY, _L("VFA"), _L("VFA"),
-        [this](wxCommandEvent&) {
-            if (!m_vfa_test_dlg)
-                m_vfa_test_dlg = new VFA_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            m_vfa_test_dlg->ShowModal();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-
-    auto bridging_menu = new wxMenu();
-    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Speed"), _L("Bridge Speed"),
-        [this](wxCommandEvent&) {
-            auto dlg = new BridgeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Flow"), _L("Bridge Flow"),
-        [this](wxCommandEvent&) {
-            auto dlg = new BridgeFlow_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
-        [this](wxCommandEvent&) {
-            auto dlg = new BridgeDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Cooling"), _L("Bridge Cooling"),
-        [this](wxCommandEvent&) {
-            auto dlg = new BridgeCooling_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-    calib_menu->AppendSubMenu(bridging_menu, _L("Bridging"));
 
     calib_menu->AppendSeparator();
 
