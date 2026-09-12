@@ -1383,9 +1383,10 @@ void PrintConfigDef::init_fff_params()
     def = this->add("overhang_fan_threshold", coEnums);
     def->label = L("Overhang cooling activation threshold");
     // xgettext:no-c-format, no-boost-format
-    def->tooltip = L("When the overhang exceeds this specified threshold, force the cooling fan to run at the 'Overhang Fan Speed' set below. "
-                     "This threshold is expressed as a percentage, indicating the portion of each line's width that is unsupported by the layer "
-                     "beneath it. Setting this value to 0% forces the cooling fan to run for all outer walls, regardless of the overhang degree.");
+    def->tooltip = L("Controls how much unsupported overhang is required before overhang cooling is applied. "
+                     "Lower values apply the overhang fan speed to more walls and bridges; higher values limit it to more severe overhangs. "
+                     "This threshold is expressed as a percentage of each line's width that is unsupported by the layer beneath it. "
+                     "This changes fan behavior only; it does not change support generation.");
     //def->sidetext = "";
     def->enum_keys_map = &ConfigOptionEnum<OverhangFanThreshold>::get_enum_values();
     def->mode = comAdvanced;
@@ -2039,7 +2040,10 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("slow_down_for_layer_cooling", coBools);
     def->label = L("Slow printing down for better layer cooling");
-    def->tooltip = L("Enable this option to slow printing speed down to ensure that the final layer time is not shorter than the layer time threshold in \"Max fan speed threshold\", so that the layer can be cooled for a longer time. This can improve the quality for small details.");
+    def->tooltip = L("Enable this option to slow printing speed when the estimated layer time is shorter than \"Full speed below\". "
+                     "When \"Keep fan always on\" is unchecked, \"Static Fan Speed\" sets the fan speed used for those short layers. "
+                     "The slicer will try to give small layers more cooling time, while respecting the minimum print speed. "
+                     "Fan speed changes still happen even when this option is disabled.");
     def->set_default_value(new ConfigOptionBools { true });
 
     def = this->add("default_acceleration", coFloats);
@@ -6388,9 +6392,9 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0.0));
 
     def = this->add("slow_down_layer_time", coFloats);
-    def->label = L("Layer time");
-    def->tooltip = L("The printing speed in exported G-code will be slowed down when the estimated layer time is "
-                     "shorter than this value in order to get better cooling for these layers.");
+    def->label = L("Full speed below");
+    def->tooltip = L("When the estimated layer time is shorter than this value, the part cooling fan reaches the paired fan speed. "
+                     "Print speed is only reduced if \"Slow printing down for better layer cooling\" is enabled.");
     def->sidetext = L_CONTEXT("s", "second");	// seconds, CIS languages need translation
     def->min = 0;
     def->max = 1000;

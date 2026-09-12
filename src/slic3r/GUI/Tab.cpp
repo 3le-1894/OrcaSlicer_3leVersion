@@ -4536,7 +4536,7 @@ void TabFilament::build()
         line.append_option(optgroup->get_option("fan_min_speed"));
         line.append_option(optgroup->get_option("fan_cooling_layer_time"));
         optgroup->append_line(line);
-        line = { L("Max fan speed threshold"), L("The part cooling fan will run at maximum speed when the estimated layer time is shorter than the threshold value.") };
+        line = { L("Max fan speed threshold"), L("When the estimated layer time is shorter than this value, the part cooling fan reaches the row's fan speed. Print speed is only reduced if \"Slow printing down for better layer cooling\" is enabled.") };
         line.label_path = "material_cooling#material-part-cooling-fan";
         line.append_option(optgroup->get_option("fan_max_speed"));
         line.append_option(optgroup->get_option("slow_down_layer_time"));
