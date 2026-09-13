@@ -372,8 +372,6 @@ public:
     void calib_VFA(const Calib_Params& params);
     void calib_fan_speed(const Calib_Params& params);
     void calib_bridge_speed(const Calib_Params& params);
-    void calib_bridge_flow(const Calib_Params& params);
-    void calib_bridge_density(const Calib_Params& params);
     void calib_bridge_flow_density(const Calib_Params& params);
     void calib_bridge_cooling(const Calib_Params& params);
     void calib_scarf_joint_speed(const Calib_Params& params);

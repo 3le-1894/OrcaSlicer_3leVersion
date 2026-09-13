@@ -35,10 +35,6 @@ wxString get_cali_mode_caption_string(CalibMode mode)
         return _L("Fan Speed Calibration");
     if (mode == CalibMode::Calib_Bridge_Speed)
         return _L("Bridge Speed Calibration");
-    if (mode == CalibMode::Calib_Bridge_Flow)
-        return _L("Bridge Flow Calibration");
-    if (mode == CalibMode::Calib_Bridge_Density)
-        return _L("Bridge Density Calibration");
     if (mode == CalibMode::Calib_Bridge_Flow_Density)
         return _L("Bridge Flow / Density Matrix Calibration");
     if (mode == CalibMode::Calib_Bridge_Cooling)
@@ -73,10 +69,6 @@ wxString get_calibration_wiki_page(CalibMode cali_mode)
     case CalibMode::Calib_Fan_Speed_Tower:
         return "";
     case CalibMode::Calib_Bridge_Speed:
-        return "";
-    case CalibMode::Calib_Bridge_Flow:
-        return "";
-    case CalibMode::Calib_Bridge_Density:
         return "";
     case CalibMode::Calib_Bridge_Flow_Density:
         return "";

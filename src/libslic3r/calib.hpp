@@ -25,8 +25,6 @@ enum class CalibMode : int {
     Calib_VFA_Tower,
     Calib_Fan_Speed_Tower,
     Calib_Bridge_Speed,
-    Calib_Bridge_Flow,
-    Calib_Bridge_Density,
     Calib_Bridge_Flow_Density,
     Calib_Bridge_Cooling,
     Calib_Scarf_Joint_Speed,

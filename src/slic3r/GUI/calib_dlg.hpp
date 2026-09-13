@@ -208,43 +208,6 @@ protected:
     Plater* m_plater;
 };
 
-class BridgeFlow_Test_Dlg : public DPIDialog
-{
-public:
-    BridgeFlow_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater);
-    ~BridgeFlow_Test_Dlg();
-    void on_dpi_changed(const wxRect& suggested_rect) override;
-
-protected:
-    virtual void on_start(wxCommandEvent& event);
-    Calib_Params m_params;
-
-    TextInput* m_tiStart;
-    TextInput* m_tiEnd;
-    TextInput* m_tiStep;
-    TextInput* m_tiBridgeSpeed;
-    Plater* m_plater;
-};
-
-class BridgeDensity_Test_Dlg : public DPIDialog
-{
-public:
-    BridgeDensity_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater);
-    ~BridgeDensity_Test_Dlg();
-    void on_dpi_changed(const wxRect& suggested_rect) override;
-
-protected:
-    virtual void on_start(wxCommandEvent& event);
-    Calib_Params m_params;
-
-    TextInput* m_tiStart;
-    TextInput* m_tiEnd;
-    TextInput* m_tiStep;
-    TextInput* m_tiBridgeSpeed;
-    TextInput* m_tiBridgeFlow;
-    Plater* m_plater;
-};
-
 class BridgeFlowDensity_Test_Dlg : public DPIDialog
 {
 public:
