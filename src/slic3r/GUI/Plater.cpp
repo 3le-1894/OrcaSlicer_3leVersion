@@ -16614,7 +16614,7 @@ void Plater::calib_scarf_conditional(const Calib_Params& params)
     print_config->set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(100, true));
 
     std::string name = "Conditional Scarf Joint";
-    ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_speed_tower_mesh(thresholds, PI / 8.0));
+    ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_speed_tower_mesh(thresholds));
     obj->name = name;
     obj->config.set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
     obj->config.set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
@@ -17056,6 +17056,131 @@ void Plater::calib_bridge_density(const Calib_Params& params)
 
     changed_objects(object_idxs);
     arrange();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
+
+    p->background_process.fff_print()->set_calib_params(params);
+}
+
+void Plater::calib_bridge_flow_density(const Calib_Params& params)
+{
+    const auto calib_bridge_flow_density_name = wxString::Format(L"Bridge Flow Density Matrix");
+    new_project(false, false, calib_bridge_flow_density_name);
+    wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
+    if (params.mode != CalibMode::Calib_Bridge_Flow_Density)
+        return;
+
+    std::vector<double> flow_ratios;
+    for (double flow_ratio = params.start; flow_ratio <= params.end + 0.0001; flow_ratio += params.step)
+        flow_ratios.emplace_back(flow_ratio);
+    if (flow_ratios.empty())
+        return;
+
+    const DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config();
+
+    auto print_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    auto printer_config = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
+
+    printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
+    print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
+    print_config->set_key_value("enable_support", new ConfigOptionBool(false));
+    print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
+    print_config->set_key_value("top_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(0));
+    print_config->set_key_value("detect_thin_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("spiral_mode", new ConfigOptionBool(false));
+    print_config->set_key_value("enable_wrapping_detection", new ConfigOptionBool(false));
+    print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
+
+    static constexpr double coupon_gap_mm = 4.0;
+    arrangement::ArrangeParams arrange_params = init_arrange_params(this);
+    Points bedpts = arrangement::get_shrink_bedpts(&full_config, arrange_params);
+
+    std::vector<size_t> object_idxs;
+    object_idxs.reserve(flow_ratios.size() * static_cast<size_t>(std::max(params.bridge_density_samples, 1)));
+    for (size_t flow_idx = 0; flow_idx < flow_ratios.size(); ++flow_idx) {
+        const double flow_ratio = flow_ratios[flow_idx];
+        int plate_idx = static_cast<int>(flow_idx);
+        auto cur_plate = get_partplate_list().get_plate(plate_idx);
+        if (!cur_plate) {
+            plate_idx = get_partplate_list().create_plate();
+            cur_plate = get_partplate_list().get_plate(plate_idx);
+        }
+        if (!cur_plate)
+            continue;
+
+        cur_plate->set_plate_name(into_u8(wxString::Format("Bridge Flow %.1f", flow_ratio)));
+
+        const Vec3d plate_origin = cur_plate->get_origin();
+        const double base_density = std::round(140.0 - flow_ratio * 30.0 + params.bridge_density_offset_start);
+        std::vector<size_t> plate_object_idxs;
+        plate_object_idxs.reserve(static_cast<size_t>(std::max(params.bridge_density_samples, 1)));
+
+        for (int density_idx = 0; density_idx < params.bridge_density_samples; ++density_idx) {
+            const double density = std::round(base_density + density_idx * params.bridge_density_step);
+            std::string name = into_u8(wxString::Format("BF=%.1f, BD=%.0f", flow_ratio, density));
+
+            ModelObject* obj = model().add_object(name.c_str(), "", bridge_calib_make_speed_group_mesh());
+            obj->name = name;
+            obj->config.set_key_value("bridge_flow", new ConfigOptionFloat(flow_ratio));
+            obj->config.set_key_value("bridge_density", new ConfigOptionPercent(density));
+            obj->config.set_key_value("bridge_angle", new ConfigOptionFloat(0.01));
+            obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
+            obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
+            obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
+
+            if (obj->instances.empty())
+                obj->add_instance();
+
+            const size_t obj_idx = model().objects.size() - 1;
+            object_idxs.emplace_back(obj_idx);
+            get_partplate_list().add_to_plate(obj_idx, 0, plate_idx);
+            plate_object_idxs.emplace_back(obj_idx);
+            sidebar().obj_list()->add_object_to_list(obj_idx);
+        }
+
+        arrangement::ArrangePolygons arranged_items;
+        arranged_items.reserve(plate_object_idxs.size());
+        for (size_t i = 0; i < plate_object_idxs.size(); ++i) {
+            ModelObject* obj = model().objects[plate_object_idxs[i]];
+            if (obj->instances.empty())
+                continue;
+
+            arrangement::ArrangePolygon arrange_poly;
+            obj->instances[0]->get_arrange_polygon(&arrange_poly, full_config);
+            arrange_poly.translation = Vec2crd{0, 0};
+            arrange_poly.bed_idx = 0;
+            arrange_poly.inflation = std::max(arrange_poly.inflation, scaled(coupon_gap_mm * 0.5));
+            arrange_poly.itemid = static_cast<int>(i);
+            arrange_poly.name = obj->name;
+            arranged_items.emplace_back(std::move(arrange_poly));
+        }
+
+        arrangement::arrange(arranged_items, bedpts, arrange_params);
+        for (const arrangement::ArrangePolygon& arranged_item : arranged_items) {
+            if (!arranged_item.is_arranged() || arranged_item.itemid < 0 ||
+                static_cast<size_t>(arranged_item.itemid) >= plate_object_idxs.size())
+                continue;
+
+            ModelObject* obj = model().objects[plate_object_idxs[static_cast<size_t>(arranged_item.itemid)]];
+            if (obj->instances.empty())
+                continue;
+
+            const Vec3d arranged_offset{
+                unscale<double>(arranged_item.translation(X)),
+                unscale<double>(arranged_item.translation(Y)),
+                0.0
+            };
+            obj->instances[0]->set_offset(plate_origin + arranged_offset);
+            obj->ensure_on_bed();
+            get_partplate_list().notify_instance_update(static_cast<int>(plate_object_idxs[static_cast<size_t>(arranged_item.itemid)]), 0);
+        }
+    }
+
+    changed_objects(object_idxs);
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();

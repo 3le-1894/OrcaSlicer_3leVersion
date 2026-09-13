@@ -1814,6 +1814,162 @@ void BridgeDensity_Test_Dlg::on_dpi_changed(const wxRect& suggested_rect)
     Fit();
 }
 
+// BridgeFlowDensity_Test_Dlg
+//
+
+BridgeFlowDensity_Test_Dlg::BridgeFlowDensity_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater)
+    : DPIDialog(parent, id, _L("Bridge Flow / Density Matrix"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+    , m_plater(plater)
+{
+    SetBackgroundColour(*wxWHITE);
+    SetForegroundColour(wxColour("#363636"));
+    SetFont(Label::Body_14);
+
+    wxBoxSizer* v_sizer = new wxBoxSizer(wxVERTICAL);
+    SetSizer(v_sizer);
+
+    wxString start_str                 = _L("Start bridge flow: ");
+    wxString end_str                   = _L("End bridge flow: ");
+    wxString step_str                  = _L("Flow step") + ": ";
+    wxString density_samples_str       = _L("Density samples: ");
+    wxString density_offset_start_str  = _L("Density offset start: ");
+    wxString density_step_str          = _L("Density step") + ": ";
+    int text_max = GetTextMax(this, std::vector<wxString>{
+        start_str, end_str, step_str,
+        density_samples_str, density_offset_start_str, density_step_str
+    });
+
+    auto st_size = wxSize(text_max, -1);
+    auto ti_size = FromDIP(wxSize(120, -1));
+
+    LabeledStaticBox* stb = new LabeledStaticBox(this, _L("Settings"));
+    wxStaticBoxSizer* settings_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
+
+    settings_sizer->AddSpacer(FromDIP(5));
+
+    auto start_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto start_text = new wxStaticText(this, wxID_ANY, start_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiStart = new TextInput(this, wxString::FromDouble(1.1), "", "", wxDefaultPosition, ti_size);
+    m_tiStart->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    start_sizer->Add(start_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    start_sizer->Add(m_tiStart, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(start_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto end_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto end_text = new wxStaticText(this, wxID_ANY, end_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiEnd = new TextInput(this, wxString::FromDouble(1.5), "", "", wxDefaultPosition, ti_size);
+    m_tiEnd->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    end_sizer->Add(end_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    end_sizer->Add(m_tiEnd, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(end_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto step_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto step_text = new wxStaticText(this, wxID_ANY, step_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiStep = new TextInput(this, wxString::FromDouble(0.1), "", "", wxDefaultPosition, ti_size);
+    m_tiStep->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    step_sizer->Add(step_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    step_sizer->Add(m_tiStep, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(step_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto density_samples_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto density_samples_text = new wxStaticText(this, wxID_ANY, density_samples_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiDensitySamples = new TextInput(this, std::to_string(5), "", "", wxDefaultPosition, ti_size);
+    m_tiDensitySamples->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    density_samples_sizer->Add(density_samples_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    density_samples_sizer->Add(m_tiDensitySamples, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(density_samples_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto density_offset_start_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto density_offset_start_text = new wxStaticText(this, wxID_ANY, density_offset_start_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiDensityOffsetStart = new TextInput(this, wxString::FromDouble(0), _L("%"), "", wxDefaultPosition, ti_size);
+    m_tiDensityOffsetStart->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    density_offset_start_sizer->Add(density_offset_start_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    density_offset_start_sizer->Add(m_tiDensityOffsetStart, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(density_offset_start_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto density_step_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto density_step_text = new wxStaticText(this, wxID_ANY, density_step_str, wxDefaultPosition, st_size, wxALIGN_LEFT);
+    m_tiDensityStep = new TextInput(this, wxString::FromDouble(1), _L("%"), "", wxDefaultPosition, ti_size);
+    m_tiDensityStep->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
+    density_step_sizer->Add(density_step_text, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    density_step_sizer->Add(m_tiDensityStep, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(2));
+    settings_sizer->Add(density_step_sizer, 0, wxLEFT, FromDIP(3));
+
+    auto info_text = new wxStaticText(this, wxID_ANY,
+        _L("Creates one plate per bridge flow value. Each plate contains bridge coupons with density values calculated from the flow and the density offsets."),
+        wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+    info_text->Wrap(FromDIP(390));
+    settings_sizer->Add(info_text, 0, wxALL | wxEXPAND, FromDIP(5));
+
+    settings_sizer->AddSpacer(FromDIP(5));
+
+    v_sizer->Add(settings_sizer, 0, wxTOP | wxRIGHT | wxLEFT | wxEXPAND, FromDIP(10));
+    v_sizer->AddSpacer(FromDIP(5));
+
+    auto dlg_btns = new DialogButtons(this, {"OK"});
+    auto bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
+    bottom_sizer->AddStretchSpacer();
+    bottom_sizer->Add(dlg_btns, 0, wxEXPAND);
+    v_sizer->Add(bottom_sizer, 0, wxEXPAND);
+
+    dlg_btns->GetOK()->Bind(wxEVT_BUTTON, &BridgeFlowDensity_Test_Dlg::on_start, this);
+
+    wxGetApp().UpdateDlgDarkUI(this);
+
+    Layout();
+    Fit();
+    v_sizer->SetSizeHints(this);
+}
+
+BridgeFlowDensity_Test_Dlg::~BridgeFlowDensity_Test_Dlg()
+{
+}
+
+void BridgeFlowDensity_Test_Dlg::on_start(wxCommandEvent& event)
+{
+    long density_samples = 0;
+    bool read_double = true;
+    read_double = read_double && m_tiStart->GetTextCtrl()->GetValue().ToDouble(&m_params.start);
+    read_double = read_double && m_tiEnd->GetTextCtrl()->GetValue().ToDouble(&m_params.end);
+    read_double = read_double && m_tiStep->GetTextCtrl()->GetValue().ToDouble(&m_params.step);
+    read_double = read_double && m_tiDensityOffsetStart->GetTextCtrl()->GetValue().ToDouble(&m_params.bridge_density_offset_start);
+    read_double = read_double && m_tiDensityStep->GetTextCtrl()->GetValue().ToDouble(&m_params.bridge_density_step);
+    bool read_samples = m_tiDensitySamples->GetTextCtrl()->GetValue().ToLong(&density_samples);
+
+    if (!read_double || !read_samples || m_params.start <= 0 || m_params.step <= 0 ||
+        m_params.end < (m_params.start + m_params.step) || density_samples < 1 || density_samples > 10 ||
+        m_params.bridge_density_step <= 0) {
+        MessageDialog msg_dlg(nullptr,
+            _L("Please input valid values:\nstart bridge flow > 0\nflow step > 0\nend bridge flow >= start bridge flow + flow step\n1 <= density samples <= 10\ndensity step > 0"),
+            wxEmptyString, wxICON_WARNING | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    const double min_flow = std::min(m_params.start, m_params.end);
+    const double max_flow = std::max(m_params.start, m_params.end);
+    const double min_density = std::round(140.0 - max_flow * 30.0 + m_params.bridge_density_offset_start);
+    const double max_density = std::round(140.0 - min_flow * 30.0 + m_params.bridge_density_offset_start + (density_samples - 1) * m_params.bridge_density_step);
+    if (min_density < 10 || max_density > 150) {
+        MessageDialog msg_dlg(nullptr,
+            _L("The generated bridge densities must stay between 10% and 150%. Adjust the flow range, density offset, or density step."),
+            wxEmptyString, wxICON_WARNING | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    m_params.bridge_density_samples = static_cast<int>(density_samples);
+    m_params.mode = CalibMode::Calib_Bridge_Flow_Density;
+    m_plater->calib_bridge_flow_density(m_params);
+    EndModal(wxID_OK);
+}
+
+void BridgeFlowDensity_Test_Dlg::on_dpi_changed(const wxRect& suggested_rect)
+{
+    this->Refresh();
+    Fit();
+}
+
 
 // BridgeCooling_Test_Dlg
 //

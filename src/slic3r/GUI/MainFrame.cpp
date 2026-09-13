@@ -3620,6 +3620,13 @@ void MainFrame::init_menubar_as_editor()
             dlg->Destroy();
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Flow / Density Matrix"), _L("Bridge Flow / Density Matrix"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeFlowDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
     append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Cooling"), _L("Bridge Cooling"),
         [this](wxCommandEvent&) {
             auto dlg = new BridgeCooling_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
@@ -3836,6 +3843,13 @@ void MainFrame::init_menubar_as_editor()
     append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Density"), _L("Bridge Density"),
         [this](wxCommandEvent&) {
             auto dlg = new BridgeDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(bridging_menu, wxID_ANY, _L("Bridge Flow / Density Matrix"), _L("Bridge Flow / Density Matrix"),
+        [this](wxCommandEvent&) {
+            auto dlg = new BridgeFlowDensity_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         }, "", nullptr,

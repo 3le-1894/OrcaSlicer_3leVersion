@@ -50,6 +50,9 @@ static wxString get_default_name(wxString filament_name, CalibMode mode){
     case Slic3r::CalibMode::Calib_Fan_Speed_Tower:
         filament_name += " Fan Speed Calibrated";
         break;
+    case Slic3r::CalibMode::Calib_Bridge_Flow_Density:
+        filament_name += " Bridge Flow Density Calibrated";
+        break;
     case Slic3r::CalibMode::Calib_Scarf_Joint_Speed:
         filament_name += " Scarf Joint Speed Calibrated";
         break;

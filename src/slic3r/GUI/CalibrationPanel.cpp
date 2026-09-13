@@ -38,6 +38,8 @@ wxString get_calibration_type_name(CalibMode cali_mode)
         return _L("Bridge Flow");
     case CalibMode::Calib_Bridge_Density:
         return _L("Bridge Density");
+    case CalibMode::Calib_Bridge_Flow_Density:
+        return _L("Bridge Flow / Density Matrix");
     case CalibMode::Calib_Bridge_Cooling:
         return _L("Bridge Cooling");
     case CalibMode::Calib_Scarf_Joint_Speed:
