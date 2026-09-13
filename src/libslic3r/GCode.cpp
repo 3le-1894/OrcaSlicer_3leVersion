@@ -5689,6 +5689,27 @@ LayerResult GCode::process_layer(
             m_calib_config.set_key_value("seam_slope_steps", new ConfigOptionInt(print.calib_params().scarf_steps));
             break;
         }
+        case CalibMode::Calib_Scarf_Conditional: {
+            const float scarf_angle_threshold = std::clamp(this->interpolate_value_across_layers(static_cast<float>(print.calib_params().start),
+                                                                                                 static_cast<float>(print.calib_params().end),
+                                                                                                 static_cast<float>(print.calib_params().step)),
+                                                           0.0f, 180.0f);
+            sprintf(buf, "; Calib_Scarf_Conditional: Z_HEIGHT: %g, scarf_angle_threshold:%g deg\n", print_z, scarf_angle_threshold);
+            gcode += buf;
+            m_calib_config.set_key_value("seam_slope_conditional", new ConfigOptionBool(true));
+            m_calib_config.set_key_value("scarf_angle_threshold", new ConfigOptionInt(static_cast<int>(std::round(scarf_angle_threshold))));
+            break;
+        }
+        case CalibMode::Calib_Scarf_Wipe_Speed: {
+            const float wipe_speed = std::max(10.0f, this->interpolate_value_across_layers(static_cast<float>(print.calib_params().start),
+                                                                                           static_cast<float>(print.calib_params().end),
+                                                                                           static_cast<float>(print.calib_params().step)));
+            sprintf(buf, "; Calib_Scarf_Wipe_Speed: Z_HEIGHT: %g, wipe_speed:%g mm/s\n", print_z, wipe_speed);
+            gcode += buf;
+            m_calib_config.set_key_value("role_based_wipe_speed", new ConfigOptionBool(false));
+            m_calib_config.set_key_value("wipe_speed", new ConfigOptionFloatOrPercent(std::round(wipe_speed), false));
+            break;
+        }
         case CalibMode::Calib_Vol_speed_Tower: {
             auto _speed = print.calib_params().start + print_z * print.calib_params().step;
             m_calib_config.set_key_value("outer_wall_speed", new ConfigOptionFloatsNullable({std::round(_speed)}));

@@ -56,6 +56,12 @@ static wxString get_default_name(wxString filament_name, CalibMode mode){
     case Slic3r::CalibMode::Calib_Scarf_Length_Steps:
         filament_name += " Scarf Length Steps Calibrated";
         break;
+    case Slic3r::CalibMode::Calib_Scarf_Conditional:
+        filament_name += " Conditional Scarf Joint Calibrated";
+        break;
+    case Slic3r::CalibMode::Calib_Scarf_Wipe_Speed:
+        filament_name += " Scarf Seam Wipe Speed Calibrated";
+        break;
     case Slic3r::CalibMode::Calib_Retraction_tower:
         break;
     case Slic3r::CalibMode::Calib_Input_shaping_freq:

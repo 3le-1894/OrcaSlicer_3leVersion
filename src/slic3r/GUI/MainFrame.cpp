@@ -3568,12 +3568,6 @@ void MainFrame::init_menubar_as_editor()
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
     auto scarf_seam_menu = new wxMenu();
-    auto show_scarf_placeholder = [this](const wxString& name) {
-        MessageDialog msg(this,
-            wxString::Format(_L("%s calibration is a placeholder for future scarf seam tuning."), name),
-            _L("Scarf Seam Tuning"), wxOK | wxICON_INFORMATION);
-        msg.ShowModal();
-    };
     append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Joint Speed"), _L("Scarf Joint Speed"),
         [this](wxCommandEvent&) {
             auto dlg = new ScarfJointSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
@@ -3588,8 +3582,19 @@ void MainFrame::init_menubar_as_editor()
             dlg->Destroy();
         },
         "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Conditional Scarf Threshold"), _L("Conditional Scarf Threshold"),
-        [show_scarf_placeholder](wxCommandEvent&) { show_scarf_placeholder(_L("Conditional Scarf Threshold")); },
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Conditional Scarf Joint"), _L("Conditional Scarf Joint"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfConditional_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Seam Wipe Speed"), _L("Scarf Seam Wipe Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfWipeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
         "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
     m_topbar->GetCalibMenu()->AppendSubMenu(scarf_seam_menu, _L("Scarf Seam Tuning"));
 
@@ -3783,12 +3788,6 @@ void MainFrame::init_menubar_as_editor()
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
     auto scarf_seam_menu = new wxMenu();
-    auto show_scarf_placeholder = [this](const wxString& name) {
-        MessageDialog msg(this,
-            wxString::Format(_L("%s calibration is a placeholder for future scarf seam tuning."), name),
-            _L("Scarf Seam Tuning"), wxOK | wxICON_INFORMATION);
-        msg.ShowModal();
-    };
     append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Joint Speed"), _L("Scarf Joint Speed"),
         [this](wxCommandEvent&) {
             auto dlg = new ScarfJointSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
@@ -3803,8 +3802,19 @@ void MainFrame::init_menubar_as_editor()
             dlg->Destroy();
         },
         "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
-    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Conditional Scarf Threshold"), _L("Conditional Scarf Threshold"),
-        [show_scarf_placeholder](wxCommandEvent&) { show_scarf_placeholder(_L("Conditional Scarf Threshold")); },
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Conditional Scarf Joint"), _L("Conditional Scarf Joint"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfConditional_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Seam Wipe Speed"), _L("Scarf Seam Wipe Speed"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfWipeSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
         "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
     calib_menu->AppendSubMenu(scarf_seam_menu, _L("Scarf Seam Tuning"));
 

@@ -30,6 +30,8 @@ enum class CalibMode : int {
     Calib_Bridge_Cooling,
     Calib_Scarf_Joint_Speed,
     Calib_Scarf_Length_Steps,
+    Calib_Scarf_Conditional,
+    Calib_Scarf_Wipe_Speed,
     Calib_Retraction_tower,
     Calib_Input_shaping_freq,
     Calib_Input_shaping_damp,

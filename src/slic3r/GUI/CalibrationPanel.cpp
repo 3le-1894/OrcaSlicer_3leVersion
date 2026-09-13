@@ -44,6 +44,10 @@ wxString get_calibration_type_name(CalibMode cali_mode)
         return _L("Scarf Joint Speed");
     case CalibMode::Calib_Scarf_Length_Steps:
         return _L("Scarf Length / Steps");
+    case CalibMode::Calib_Scarf_Conditional:
+        return _L("Conditional Scarf Joint");
+    case CalibMode::Calib_Scarf_Wipe_Speed:
+        return _L("Scarf Seam Wipe Speed");
     case CalibMode::Calib_Retraction_tower:
         return _L("Retraction");
     default:

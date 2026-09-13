@@ -377,6 +377,8 @@ public:
     void calib_bridge_cooling(const Calib_Params& params);
     void calib_scarf_joint_speed(const Calib_Params& params);
     void calib_scarf_length_steps(const Calib_Params& params);
+    void calib_scarf_conditional(const Calib_Params& params);
+    void calib_scarf_wipe_speed(const Calib_Params& params);
     void calib_input_shaping_freq(const Calib_Params& params);
     void calib_input_shaping_damp(const Calib_Params& params);
     void Calib_Cornering(const Calib_Params& params);

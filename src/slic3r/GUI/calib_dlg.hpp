@@ -157,6 +157,40 @@ protected:
     Plater* m_plater;
 };
 
+class ScarfConditional_Test_Dlg : public DPIDialog
+{
+public:
+    ScarfConditional_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater);
+    ~ScarfConditional_Test_Dlg();
+    void on_dpi_changed(const wxRect& suggested_rect) override;
+
+protected:
+    virtual void on_start(wxCommandEvent& event);
+    Calib_Params m_params;
+
+    TextInput* m_tiStart;
+    TextInput* m_tiEnd;
+    TextInput* m_tiStep;
+    Plater* m_plater;
+};
+
+class ScarfWipeSpeed_Test_Dlg : public DPIDialog
+{
+public:
+    ScarfWipeSpeed_Test_Dlg(wxWindow* parent, wxWindowID id, Plater* plater);
+    ~ScarfWipeSpeed_Test_Dlg();
+    void on_dpi_changed(const wxRect& suggested_rect) override;
+
+protected:
+    virtual void on_start(wxCommandEvent& event);
+    Calib_Params m_params;
+
+    TextInput* m_tiStart;
+    TextInput* m_tiEnd;
+    TextInput* m_tiStep;
+    Plater* m_plater;
+};
+
 class BridgeSpeed_Test_Dlg : public DPIDialog
 {
 public:

@@ -16428,7 +16428,7 @@ void Plater::calib_fan_speed(const Calib_Params& params)
     p->background_process.fff_print()->set_calib_params(params);
 }
 
-static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>& speeds);
+static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>& speeds, double facet_angle = PI / 48.0);
 
 void Plater::calib_scarf_joint_speed(const Calib_Params& params)
 {
@@ -16467,9 +16467,7 @@ void Plater::calib_scarf_joint_speed(const Calib_Params& params)
     print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
     print_config->set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
     print_config->set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
-    print_config->set_key_value("seam_slope_conditional", new ConfigOptionBool(false));
     print_config->set_key_value("seam_slope_min_length", new ConfigOptionFloat(20.0));
-    print_config->set_key_value("seam_slope_steps", new ConfigOptionInt(10));
     print_config->set_key_value("scarf_joint_flow_ratio", new ConfigOptionFloat(1.0));
     print_config->set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(params.start, false));
 
@@ -16478,7 +16476,6 @@ void Plater::calib_scarf_joint_speed(const Calib_Params& params)
     obj->name = name;
     obj->config.set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
     obj->config.set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
-    obj->config.set_key_value("seam_slope_conditional", new ConfigOptionBool(false));
     obj->config.set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(params.start, false));
     obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
     obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
@@ -16539,7 +16536,6 @@ void Plater::calib_scarf_length_steps(const Calib_Params& params)
     print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
     print_config->set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
     print_config->set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
-    print_config->set_key_value("seam_slope_conditional", new ConfigOptionBool(false));
     print_config->set_key_value("seam_slope_min_length", new ConfigOptionFloat(params.start));
     print_config->set_key_value("seam_slope_steps", new ConfigOptionInt(params.scarf_steps));
     print_config->set_key_value("scarf_joint_flow_ratio", new ConfigOptionFloat(1.0));
@@ -16550,9 +16546,153 @@ void Plater::calib_scarf_length_steps(const Calib_Params& params)
     obj->name = name;
     obj->config.set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
     obj->config.set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
-    obj->config.set_key_value("seam_slope_conditional", new ConfigOptionBool(false));
     obj->config.set_key_value("seam_slope_min_length", new ConfigOptionFloat(params.start));
     obj->config.set_key_value("seam_slope_steps", new ConfigOptionInt(params.scarf_steps));
+    obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
+    obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
+    obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
+    if (obj->instances.empty())
+        obj->add_instance();
+    obj->ensure_on_bed();
+
+    const size_t obj_idx = model().objects.size() - 1;
+    get_partplate_list().add_to_plate(obj_idx, 0, 0);
+    sidebar().obj_list()->add_object_to_list(obj_idx);
+
+    changed_objects({ obj_idx });
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
+
+    p->background_process.fff_print()->set_calib_params(params);
+}
+
+void Plater::calib_scarf_conditional(const Calib_Params& params)
+{
+    const auto calib_scarf_conditional_name = wxString::Format(L"Conditional Scarf Joint Test");
+    new_project(false, false, calib_scarf_conditional_name);
+    wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
+    if (params.mode != CalibMode::Calib_Scarf_Conditional)
+        return;
+
+    std::vector<double> thresholds;
+    for (double threshold = params.start; threshold <= params.end + 0.001; threshold += params.step)
+        thresholds.emplace_back(threshold);
+    if (thresholds.empty())
+        return;
+
+    auto print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
+    auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
+
+    printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
+    filament_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats { 0.0 });
+    filament_config->set_key_value("slow_down_min_speed", new ConfigOptionFloats { 0.0 });
+    filament_config->set_key_value("slow_down_for_layer_cooling", new ConfigOptionBools{false});
+    print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
+    print_config->set_key_value("enable_support", new ConfigOptionBool(false));
+    set_config_values<bool, ConfigOptionBoolsNullable>(print_config, "enable_overhang_speed", false);
+    print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
+    print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
+    print_config->set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("top_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(10));
+    print_config->set_key_value("detect_thin_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("spiral_mode", new ConfigOptionBool(false));
+    print_config->set_key_value("enable_wrapping_detection", new ConfigOptionBool(false));
+    print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
+    print_config->set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
+    print_config->set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
+    print_config->set_key_value("seam_slope_conditional", new ConfigOptionBool(true));
+    print_config->set_key_value("scarf_angle_threshold", new ConfigOptionInt(static_cast<int>(std::round(params.start))));
+    print_config->set_key_value("seam_slope_min_length", new ConfigOptionFloat(20.0));
+    print_config->set_key_value("scarf_joint_flow_ratio", new ConfigOptionFloat(1.0));
+    print_config->set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(100, true));
+
+    std::string name = "Conditional Scarf Joint";
+    ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_speed_tower_mesh(thresholds, PI / 8.0));
+    obj->name = name;
+    obj->config.set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
+    obj->config.set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
+    obj->config.set_key_value("seam_slope_conditional", new ConfigOptionBool(true));
+    obj->config.set_key_value("scarf_angle_threshold", new ConfigOptionInt(static_cast<int>(std::round(params.start))));
+    obj->config.set_key_value("seam_slope_min_length", new ConfigOptionFloat(20.0));
+    obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
+    obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
+    obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
+    if (obj->instances.empty())
+        obj->add_instance();
+    obj->ensure_on_bed();
+
+    const size_t obj_idx = model().objects.size() - 1;
+    get_partplate_list().add_to_plate(obj_idx, 0, 0);
+    sidebar().obj_list()->add_object_to_list(obj_idx);
+
+    changed_objects({ obj_idx });
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
+
+    p->background_process.fff_print()->set_calib_params(params);
+}
+
+void Plater::calib_scarf_wipe_speed(const Calib_Params& params)
+{
+    const auto calib_scarf_wipe_speed_name = wxString::Format(L"Scarf Seam Wipe Speed Test");
+    new_project(false, false, calib_scarf_wipe_speed_name);
+    wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
+    if (params.mode != CalibMode::Calib_Scarf_Wipe_Speed)
+        return;
+
+    std::vector<double> speeds;
+    for (double speed = params.start; speed <= params.end + 0.001; speed += params.step)
+        speeds.emplace_back(speed);
+    if (speeds.empty())
+        return;
+
+    auto print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
+    auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
+
+    printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
+    filament_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats { 0.0 });
+    filament_config->set_key_value("slow_down_min_speed", new ConfigOptionFloats { 0.0 });
+    filament_config->set_key_value("slow_down_for_layer_cooling", new ConfigOptionBools{false});
+    print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
+    print_config->set_key_value("enable_support", new ConfigOptionBool(false));
+    set_config_values<bool, ConfigOptionBoolsNullable>(print_config, "enable_overhang_speed", false);
+    print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
+    print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
+    print_config->set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("top_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(10));
+    print_config->set_key_value("detect_thin_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("spiral_mode", new ConfigOptionBool(false));
+    print_config->set_key_value("enable_wrapping_detection", new ConfigOptionBool(false));
+    print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
+    print_config->set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
+    print_config->set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
+    print_config->set_key_value("seam_slope_min_length", new ConfigOptionFloat(20.0));
+    print_config->set_key_value("scarf_joint_flow_ratio", new ConfigOptionFloat(1.0));
+    print_config->set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(100, true));
+    print_config->set_key_value("role_based_wipe_speed", new ConfigOptionBool(false));
+    print_config->set_key_value("wipe_speed", new ConfigOptionFloatOrPercent(params.start, false));
+
+    std::string name = "Scarf Seam Wipe Speed";
+    ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_speed_tower_mesh(speeds));
+    obj->name = name;
+    obj->config.set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
+    obj->config.set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
+    obj->config.set_key_value("role_based_wipe_speed", new ConfigOptionBool(false));
+    obj->config.set_key_value("wipe_speed", new ConfigOptionFloatOrPercent(params.start, false));
     obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
     obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
     obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
@@ -16641,14 +16781,13 @@ static void scarf_calib_add_speed_label(indexed_triangle_set& mesh, double speed
         scarf_calib_add_digit_label(mesh, label[i], start_x + i * (digit_width + digit_gap), start_y, start_z, label_depth);
 }
 
-static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>& speeds)
+static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>& speeds, double facet_angle)
 {
     static constexpr double body_radius    = 18.0;
     static constexpr double section_height = 10.0;
     static constexpr double base_height    = 1.2;
     static constexpr double band_height    = 0.8;
     static constexpr double band_radius    = body_radius + 0.9;
-    static constexpr double facet_angle    = PI / 48.0;
 
     const size_t level_count = std::max<size_t>(speeds.size(), 1);
     const double tower_height = section_height * level_count;

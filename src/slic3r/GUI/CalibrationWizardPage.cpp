@@ -45,6 +45,10 @@ wxString get_cali_mode_caption_string(CalibMode mode)
         return _L("Scarf Joint Speed Calibration");
     if (mode == CalibMode::Calib_Scarf_Length_Steps)
         return _L("Scarf Length / Steps Calibration");
+    if (mode == CalibMode::Calib_Scarf_Conditional)
+        return _L("Conditional Scarf Joint Calibration");
+    if (mode == CalibMode::Calib_Scarf_Wipe_Speed)
+        return _L("Scarf Seam Wipe Speed Calibration");
     return "no cali_mode_caption";
 }
 
@@ -77,6 +81,10 @@ wxString get_calibration_wiki_page(CalibMode cali_mode)
     case CalibMode::Calib_Scarf_Joint_Speed:
         return "";
     case CalibMode::Calib_Scarf_Length_Steps:
+        return "";
+    case CalibMode::Calib_Scarf_Conditional:
+        return "";
+    case CalibMode::Calib_Scarf_Wipe_Speed:
         return "";
     case CalibMode::Calib_Retraction_tower:
         return wxString::Format("https://wiki.bambulab.com/%s/software/bambu-studio/calibration_retraction", region);
