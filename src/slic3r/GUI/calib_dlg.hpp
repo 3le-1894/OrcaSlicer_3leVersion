@@ -242,9 +242,6 @@ protected:
     TextInput* m_tiStart;
     TextInput* m_tiEnd;
     TextInput* m_tiStep;
-    TextInput* m_tiBridgeSpeed;
-    TextInput* m_tiBridgeFlow;
-    TextInput* m_tiBridgeDensity;
     Plater* m_plater;
 };
 

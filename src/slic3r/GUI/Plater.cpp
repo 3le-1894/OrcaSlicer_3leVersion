@@ -17066,7 +17066,7 @@ void Plater::calib_bridge_flow_density(const Calib_Params& params)
 
 void Plater::calib_bridge_cooling(const Calib_Params& params)
 {
-    const auto calib_bridge_cooling_name = wxString::Format(L"Bridge cooling test");
+    const auto calib_bridge_cooling_name = wxString::Format(L"Bridge Cooling Test");
     new_project(false, false, calib_bridge_cooling_name);
     wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
     if (params.mode != CalibMode::Calib_Bridge_Cooling)
@@ -17098,9 +17098,6 @@ void Plater::calib_bridge_cooling(const Calib_Params& params)
     std::string name = "Bridge Cooling";
     ModelObject* obj = model().add_object(name.c_str(), "", bridge_calib_make_cooling_tower_mesh(static_cast<size_t>(level_count)));
     obj->name = name;
-    obj->config.set_key_value("bridge_speed", new ConfigOptionFloatsNullable(1, params.bridge_speed));
-    obj->config.set_key_value("bridge_flow", new ConfigOptionFloat(params.bridge_flow));
-    obj->config.set_key_value("bridge_density", new ConfigOptionPercent(params.bridge_density));
     obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
     obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
     obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
