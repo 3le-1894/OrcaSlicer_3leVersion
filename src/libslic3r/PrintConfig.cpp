@@ -1357,6 +1357,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Everywhere"));
     def->enum_labels.push_back(L("Top and bottom surfaces"));
     def->enum_labels.push_back(L("Nowhere"));
+    def->width = 24;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<GapFillTarget>(gftNowhere));
 
@@ -1872,6 +1873,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.emplace_back(L("Inner brim only"));
     def->enum_labels.emplace_back(L("Outer and inner brim"));
     def->enum_labels.emplace_back(L("No-brim"));
+    def->width = 40;
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum<BrimType>(btAutoBrim));
 
@@ -2199,6 +2201,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("External bridge only"));
     def->enum_labels.push_back(L("Internal bridge only"));
     def->enum_labels.push_back(L("Apply to all"));
+    def->width = 24;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<EnableExtraBridgeLayer>(eblDisabled));
 
@@ -2307,6 +2310,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Hilbert Curve"));
     def->enum_labels.push_back(L("Archimedean Chords"));
     def->enum_labels.push_back(L("Octagram Spiral"));
+    def->width = 24;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipMonotonicLine));
 
     def = this->add("top_surface_density", coPercent);
@@ -2359,6 +2363,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Inward and Outward"));
     def->enum_labels.push_back(L("Inward"));
     def->enum_labels.push_back(L("Outward"));
+    def->width = 24;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<TopSurfaceExpansionDirection>(TopSurfaceExpansionDirection::InwardAndOutward));
 
@@ -2369,6 +2374,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
     def->enum_values = def_top_fill_pattern->enum_values;
     def->enum_labels = def_top_fill_pattern->enum_labels;
+    def->width = 24;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipMonotonic));
 
     def           = this->add("bottom_surface_density", coPercent);
@@ -2423,6 +2429,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_keys_map = &ConfigOptionEnum<InfillPattern>::get_enum_values();
     def->enum_values   = def_top_fill_pattern->enum_values;
     def->enum_labels   = def_top_fill_pattern->enum_labels;
+    def->width = 24;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipMonotonic));
     
     def = this->add("outer_wall_line_width", coFloatOrPercent);
@@ -3524,6 +3531,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Hilbert Curve"));
     def->enum_labels.push_back(L("Archimedean Chords"));
     def->enum_labels.push_back(L("Octagram Spiral"));
+    def->width = 24;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipCrossHatch));
 
     def = this->add("sparse_infill_smooth_factor", coPercent);
@@ -3989,6 +3997,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Ridged Multifractal"));
     def->enum_labels.push_back(L("Voronoi"));
     def->enum_labels.push_back(L("Ripple"));
+    def->width = 24;
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum<NoiseType>(NoiseType::Classic));
 
@@ -4805,6 +4814,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("All top surfaces"));
     def->enum_labels.push_back(L("Topmost surface only"));
     def->enum_labels.push_back(L("All solid layers"));
+    def->width = 24;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<IroningType>(IroningType::NoIroning));
 
@@ -6738,6 +6748,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Tree (auto)"));
     def->enum_labels.push_back(L("Normal (manual)"));
     def->enum_labels.push_back(L("Tree (manual)"));
+    def->width = 40;
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum<SupportType>(stNormalAuto));
 
@@ -6845,6 +6856,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Support");
     def->tooltip = L("Filament to print support base and raft.\n\"Default\" means no specific filament for support and current filament is used.");
     def->min = 0;
+    def->width = 24;
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionInt(0));
 
@@ -6880,6 +6892,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Support");
     def->tooltip = L("Filament to print support interface.\n\"Default\" means no specific filament for support interface and current filament is used.");
     def->min = 0;
+    def->width = 24;
     // BBS
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionInt(0));
@@ -6968,6 +6981,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Honeycomb"));
     def->enum_labels.push_back(L("Lightning"));
     def->enum_labels.push_back(L("Hollow"));
+    def->width = 40;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<SupportMaterialPattern>(smpDefault));
 
@@ -6986,6 +7000,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Concentric"));
     def->enum_labels.push_back(L("Rectilinear Interlaced"));
     def->enum_labels.push_back(L("Grid"));
+    def->width = 40;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<SupportMaterialInterfacePattern>(smipAuto));
 
@@ -7040,6 +7055,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Tree Slim"));
     def->enum_labels.push_back(L("Tree Strong"));
     def->enum_labels.push_back(L("Tree Hybrid"));
+    def->width = 40;
 
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<SupportMaterialStyle>(smsDefault));
@@ -7232,6 +7248,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("concentric");
     def->enum_labels.push_back(L("Rectilinear"));
     def->enum_labels.push_back(L("Concentric"));
+    def->width = 40;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipRectilinear));
     

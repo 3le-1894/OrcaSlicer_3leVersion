@@ -16781,33 +16781,95 @@ static void scarf_calib_add_speed_label(indexed_triangle_set& mesh, double speed
         scarf_calib_add_digit_label(mesh, label[i], start_x + i * (digit_width + digit_gap), start_y, start_z, label_depth);
 }
 
+static indexed_triangle_set scarf_calib_make_sloped_tower_body(size_t level_count, double body_radius, double section_height, double slope_height, double base_height, double facet_angle)
+{
+    indexed_triangle_set mesh;
+    const size_t n_steps    = static_cast<size_t>(ceil(2.0 * PI / facet_angle));
+    const double angle_step = 2.0 * PI / n_steps;
+    const double inner_radius = std::max(1.0, body_radius - slope_height);
+
+    std::vector<double> z_rings;
+    std::vector<double> r_rings;
+    z_rings.reserve(level_count * 4 + 2);
+    r_rings.reserve(level_count * 4 + 2);
+
+    auto add_ring = [&](double z, double r) {
+        if (!z_rings.empty() && std::abs(z_rings.back() - z) < 1e-6) {
+            r_rings.back() = r;
+            return;
+        }
+        z_rings.emplace_back(z);
+        r_rings.emplace_back(r);
+    };
+
+    add_ring(base_height, inner_radius);
+    for (size_t level_idx = 0; level_idx < level_count; ++level_idx) {
+        const double section_bottom = base_height + level_idx * section_height;
+        const double section_top    = section_bottom + section_height;
+        const double bottom_slope_z = std::min(section_bottom + slope_height, section_top);
+        const double top_slope_z    = std::max(section_top - slope_height, bottom_slope_z);
+
+        add_ring(section_bottom, inner_radius);
+        add_ring(bottom_slope_z, body_radius);
+        add_ring(top_slope_z, body_radius);
+        add_ring(section_top, inner_radius);
+    }
+
+    auto& vertices = mesh.vertices;
+    auto& facets   = mesh.indices;
+    vertices.reserve(z_rings.size() * n_steps + 2);
+    facets.reserve((z_rings.size() - 1) * n_steps * 2 + n_steps * 2);
+
+    const int bottom_center = static_cast<int>(vertices.size());
+    vertices.emplace_back(Vec3f(0.0f, 0.0f, float(z_rings.front())));
+    const int top_center = static_cast<int>(vertices.size());
+    vertices.emplace_back(Vec3f(0.0f, 0.0f, float(z_rings.back())));
+
+    std::vector<std::vector<int>> rings(z_rings.size(), std::vector<int>(n_steps));
+    for (size_t ring_idx = 0; ring_idx < z_rings.size(); ++ring_idx) {
+        for (size_t step_idx = 0; step_idx < n_steps; ++step_idx) {
+            const double angle = angle_step * step_idx;
+            const Vec2f p = Eigen::Rotation2Df(float(angle)) * Eigen::Vector2f(0.0f, float(r_rings[ring_idx]));
+            rings[ring_idx][step_idx] = static_cast<int>(vertices.size());
+            vertices.emplace_back(Vec3f(p(0), p(1), float(z_rings[ring_idx])));
+        }
+    }
+
+    for (size_t ring_idx = 0; ring_idx + 1 < z_rings.size(); ++ring_idx) {
+        for (size_t step_idx = 0; step_idx < n_steps; ++step_idx) {
+            const size_t next = (step_idx + 1) % n_steps;
+            const int a = rings[ring_idx][step_idx];
+            const int b = rings[ring_idx][next];
+            const int c = rings[ring_idx + 1][step_idx];
+            const int d = rings[ring_idx + 1][next];
+            facets.emplace_back(d, c, a);
+            facets.emplace_back(d, a, b);
+        }
+    }
+
+    for (size_t step_idx = 0; step_idx < n_steps; ++step_idx) {
+        const size_t next = (step_idx + 1) % n_steps;
+        facets.emplace_back(bottom_center, rings.front()[next], rings.front()[step_idx]);
+        facets.emplace_back(top_center, rings.back()[step_idx], rings.back()[next]);
+    }
+
+    return mesh;
+}
+
 static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>& speeds, double facet_angle)
 {
     static constexpr double body_radius    = 18.0;
     static constexpr double section_height = 10.0;
     static constexpr double base_height    = 1.2;
-    static constexpr double band_height    = 0.8;
     static constexpr double band_radius    = body_radius + 0.9;
+    static constexpr double slope_height   = 2.0;
 
     const size_t level_count = std::max<size_t>(speeds.size(), 1);
-    const double tower_height = section_height * level_count;
 
     indexed_triangle_set mesh;
     its_merge(mesh, its_make_cylinder(band_radius, base_height, facet_angle));
 
-    indexed_triangle_set body = its_make_cylinder(body_radius, tower_height, facet_angle);
-    for (stl_vertex& vertex : body.vertices)
-        vertex += Vec3f(0.0f, 0.0f, float(base_height));
-    its_merge(mesh, body);
-
-    // Horizontal bands make the speed sections visible on the printed part.
-    for (size_t level_idx = 1; level_idx < level_count; ++level_idx) {
-        const double z = base_height + level_idx * section_height - band_height * 0.5;
-        indexed_triangle_set band = its_make_cylinder(band_radius, band_height, facet_angle);
-        for (stl_vertex& vertex : band.vertices)
-            vertex += Vec3f(0.0f, 0.0f, float(z));
-        its_merge(mesh, band);
-    }
+    its_merge(mesh, scarf_calib_make_sloped_tower_body(level_count, body_radius, section_height, slope_height, base_height, facet_angle));
 
     // Raised front labels make each speed section readable after slicing and printing.
     for (size_t level_idx = 0; level_idx < speeds.size(); ++level_idx) {

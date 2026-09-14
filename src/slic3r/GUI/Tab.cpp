@@ -2927,8 +2927,13 @@ void TabPrint::build()
     page = add_options_page(L("Support"), "custom-gcode_support"); // ORCA: icon only visible on placeholders
         optgroup = page->new_optgroup(L("Support"), L"param_support");
         optgroup->append_single_option_line("enable_support", "support_settings_support");
-        optgroup->append_single_option_line("support_type", "support_settings_support#type");
-        optgroup->append_single_option_line("support_style", "support_settings_support#style");
+        auto append_full_width_support_option = [&optgroup](const std::string& opt_key, const std::string& path) {
+            Option option = optgroup->get_option(opt_key);
+            option.opt.full_width = true;
+            optgroup->append_single_option_line(option, path);
+        };
+        append_full_width_support_option("support_type", "support_settings_support#type");
+        append_full_width_support_option("support_style", "support_settings_support#style");
         optgroup->append_single_option_line("support_threshold_angle", "support_settings_support#threshold-angle");
         optgroup->append_single_option_line("support_threshold_overlap", "support_settings_support#threshold-overlap");
         optgroup->append_single_option_line("raft_first_layer_density", "support_settings_support#initial-layer-density");
@@ -2939,17 +2944,17 @@ void TabPrint::build()
         //optgroup->append_single_option_line("enforce_support_layers", "support_settings_support");
 
         optgroup = page->new_optgroup(L("Raft"), L"param_raft");
-        optgroup->append_single_option_line("raft_layers", "support_settings_raft");
+        append_full_width_support_option("raft_layers", "support_settings_raft");
         optgroup->append_single_option_line("raft_contact_distance", "support_settings_raft");
 
         optgroup = page->new_optgroup(L("Filament for Supports"), L"param_support_filament");
-        optgroup->append_single_option_line("support_filament", "support_settings_filament#base");
-        optgroup->append_single_option_line("support_interface_filament", "support_settings_filament#interface");
+        append_full_width_support_option("support_filament", "support_settings_filament#base");
+        append_full_width_support_option("support_interface_filament", "support_settings_filament#interface");
         optgroup->append_single_option_line("support_interface_not_for_body", "support_settings_filament#avoid-interface-filament-for-base");
 
         optgroup = page->new_optgroup(L("Support ironing"), L"param_ironing");
         optgroup->append_single_option_line("support_ironing", "support_settings_ironing");
-        optgroup->append_single_option_line("support_ironing_pattern", "support_settings_ironing#pattern");
+        append_full_width_support_option("support_ironing_pattern", "support_settings_ironing#pattern");
         optgroup->append_single_option_line("support_ironing_flow", "support_settings_ironing#flow");
         optgroup->append_single_option_line("support_ironing_spacing", "support_settings_ironing#line-spacing");
 
@@ -2960,12 +2965,12 @@ void TabPrint::build()
         optgroup->append_single_option_line("support_top_z_distance", "support_settings_advanced#z-distance");
         optgroup->append_single_option_line("support_bottom_z_distance", "support_settings_advanced#z-distance");
         optgroup->append_single_option_line("tree_support_wall_count", "support_settings_advanced#support-wall-loops");
-        optgroup->append_single_option_line("support_base_pattern", "support_settings_advanced#base-pattern");
+        append_full_width_support_option("support_base_pattern", "support_settings_advanced#base-pattern");
         optgroup->append_single_option_line("support_base_pattern_spacing", "support_settings_advanced#base-pattern-spacing");
         optgroup->append_single_option_line("support_angle", "support_settings_advanced#pattern-angle");
-        optgroup->append_single_option_line("support_interface_top_layers", "support_settings_advanced#interface-layers");
-        optgroup->append_single_option_line("support_interface_bottom_layers", "support_settings_advanced#interface-layers");
-        optgroup->append_single_option_line("support_interface_pattern", "support_settings_advanced#interface-pattern");
+        append_full_width_support_option("support_interface_top_layers", "support_settings_advanced#interface-layers");
+        append_full_width_support_option("support_interface_bottom_layers", "support_settings_advanced#interface-layers");
+        append_full_width_support_option("support_interface_pattern", "support_settings_advanced#interface-pattern");
         optgroup->append_single_option_line("support_interface_spacing", "support_settings_advanced#interface-spacing");
         optgroup->append_single_option_line("support_bottom_interface_spacing", "support_settings_advanced#interface-spacing");
         optgroup->append_single_option_line("support_expansion", "support_settings_advanced#normal-support-expansion");
@@ -3016,13 +3021,18 @@ void TabPrint::build()
         optgroup->append_single_option_line("single_extruder_multi_material_priming", "multimaterial_settings_prime_tower");
 
         optgroup = page->new_optgroup(L("Filament for Features"), L"param_filament_for_features");
-        optgroup->append_single_option_line("outer_wall_filament_id", "multimaterial_settings_filament_for_features#outer-walls");
-        optgroup->append_single_option_line("inner_wall_filament_id", "multimaterial_settings_filament_for_features#inner-walls");
-        optgroup->append_single_option_line("sparse_infill_filament_id", "multimaterial_settings_filament_for_features#sparse-infill");
-        optgroup->append_single_option_line("internal_solid_filament_id", "multimaterial_settings_filament_for_features#internal-solid-infill");
-        optgroup->append_single_option_line("top_surface_filament_id", "multimaterial_settings_filament_for_features#top-surface");
-        optgroup->append_single_option_line("bottom_surface_filament_id", "multimaterial_settings_filament_for_features#bottom-surface");
-        optgroup->append_single_option_line("wipe_tower_filament", "multimaterial_settings_filament_for_features#wipe-tower");
+        auto append_full_width_multimaterial_option = [&optgroup](const std::string& opt_key, const std::string& path) {
+            Option option = optgroup->get_option(opt_key);
+            option.opt.full_width = true;
+            optgroup->append_single_option_line(option, path);
+        };
+        append_full_width_multimaterial_option("outer_wall_filament_id", "multimaterial_settings_filament_for_features#outer-walls");
+        append_full_width_multimaterial_option("inner_wall_filament_id", "multimaterial_settings_filament_for_features#inner-walls");
+        append_full_width_multimaterial_option("sparse_infill_filament_id", "multimaterial_settings_filament_for_features#sparse-infill");
+        append_full_width_multimaterial_option("internal_solid_filament_id", "multimaterial_settings_filament_for_features#internal-solid-infill");
+        append_full_width_multimaterial_option("top_surface_filament_id", "multimaterial_settings_filament_for_features#top-surface");
+        append_full_width_multimaterial_option("bottom_surface_filament_id", "multimaterial_settings_filament_for_features#bottom-surface");
+        append_full_width_multimaterial_option("wipe_tower_filament", "multimaterial_settings_filament_for_features#wipe-tower");
 
         optgroup = page->new_optgroup(L("Ooze prevention"), L"param_ooze_prevention");
         optgroup->append_single_option_line("ooze_prevention", "multimaterial_settings_ooze_prevention");
@@ -3036,7 +3046,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("flush_into_support", "multimaterial_settings_flush_options#flush-into-objects-support");
         optgroup = page->new_optgroup(L("Advanced"), L"advanced");
         optgroup->append_single_option_line("interlocking_beam", "multimaterial_settings_advanced#interlocking-beam");
-        optgroup->append_single_option_line("toolchange_ordering", "multimaterial_settings_advanced#toolchange-ordering");
+        append_full_width_multimaterial_option("toolchange_ordering", "multimaterial_settings_advanced#toolchange-ordering");
         optgroup->append_single_option_line("interface_shells", "multimaterial_settings_advanced#interface-shells");
         optgroup->append_single_option_line("mmu_segmented_region_max_width", "multimaterial_settings_advanced#maximum-width-of-segmented-region");
         optgroup->append_single_option_line("mmu_segmented_region_interlocking_depth", "multimaterial_settings_advanced#interlocking-depth-of-segmented-region");
