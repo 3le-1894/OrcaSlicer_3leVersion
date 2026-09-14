@@ -16429,6 +16429,7 @@ void Plater::calib_fan_speed(const Calib_Params& params)
 }
 
 static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>& speeds, double facet_angle = PI / 48.0);
+static TriangleMesh scarf_calib_make_conditional_tower_mesh(const std::vector<double>& thresholds, double facet_angle = PI / 48.0);
 
 void Plater::calib_scarf_joint_speed(const Calib_Params& params)
 {
@@ -16614,7 +16615,7 @@ void Plater::calib_scarf_conditional(const Calib_Params& params)
     print_config->set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(100, true));
 
     std::string name = "Conditional Scarf Joint";
-    ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_speed_tower_mesh(thresholds));
+    ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_conditional_tower_mesh(thresholds));
     obj->name = name;
     obj->config.set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
     obj->config.set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
@@ -16856,6 +16857,81 @@ static indexed_triangle_set scarf_calib_make_sloped_tower_body(size_t level_coun
     return mesh;
 }
 
+static indexed_triangle_set scarf_calib_make_sloped_profile_tower_body(const std::vector<Vec2f>& profile, double body_radius, size_t level_count, double section_height, double slope_height, double base_height)
+{
+    indexed_triangle_set mesh;
+    if (profile.size() < 3)
+        return mesh;
+
+    const double inner_scale = std::max(0.1, (body_radius - slope_height) / body_radius);
+
+    std::vector<double> z_rings;
+    std::vector<double> scale_rings;
+    z_rings.reserve(level_count * 4 + 2);
+    scale_rings.reserve(level_count * 4 + 2);
+
+    auto add_ring = [&](double z, double scale) {
+        if (!z_rings.empty() && std::abs(z_rings.back() - z) < 1e-6) {
+            scale_rings.back() = scale;
+            return;
+        }
+        z_rings.emplace_back(z);
+        scale_rings.emplace_back(scale);
+    };
+
+    add_ring(base_height, inner_scale);
+    for (size_t level_idx = 0; level_idx < level_count; ++level_idx) {
+        const double section_bottom = base_height + level_idx * section_height;
+        const double section_top    = section_bottom + section_height;
+        const double bottom_slope_z = std::min(section_bottom + slope_height, section_top);
+        const double top_slope_z    = std::max(section_top - slope_height, bottom_slope_z);
+
+        add_ring(section_bottom, inner_scale);
+        add_ring(bottom_slope_z, 1.0);
+        add_ring(top_slope_z, 1.0);
+        add_ring(section_top, inner_scale);
+    }
+
+    auto& vertices = mesh.vertices;
+    auto& facets   = mesh.indices;
+    vertices.reserve(z_rings.size() * profile.size() + 2);
+    facets.reserve((z_rings.size() - 1) * profile.size() * 2 + profile.size() * 2);
+
+    const int bottom_center = static_cast<int>(vertices.size());
+    vertices.emplace_back(Vec3f(0.0f, 0.0f, float(z_rings.front())));
+    const int top_center = static_cast<int>(vertices.size());
+    vertices.emplace_back(Vec3f(0.0f, 0.0f, float(z_rings.back())));
+
+    std::vector<std::vector<int>> rings(z_rings.size(), std::vector<int>(profile.size()));
+    for (size_t ring_idx = 0; ring_idx < z_rings.size(); ++ring_idx) {
+        for (size_t vertex_idx = 0; vertex_idx < profile.size(); ++vertex_idx) {
+            const Vec2f p = profile[vertex_idx] * float(scale_rings[ring_idx]);
+            rings[ring_idx][vertex_idx] = static_cast<int>(vertices.size());
+            vertices.emplace_back(Vec3f(p.x(), p.y(), float(z_rings[ring_idx])));
+        }
+    }
+
+    for (size_t ring_idx = 0; ring_idx + 1 < z_rings.size(); ++ring_idx) {
+        for (size_t vertex_idx = 0; vertex_idx < profile.size(); ++vertex_idx) {
+            const size_t next = (vertex_idx + 1) % profile.size();
+            const int a = rings[ring_idx][vertex_idx];
+            const int b = rings[ring_idx][next];
+            const int c = rings[ring_idx + 1][vertex_idx];
+            const int d = rings[ring_idx + 1][next];
+            facets.emplace_back(d, c, a);
+            facets.emplace_back(d, a, b);
+        }
+    }
+
+    for (size_t vertex_idx = 0; vertex_idx < profile.size(); ++vertex_idx) {
+        const size_t next = (vertex_idx + 1) % profile.size();
+        facets.emplace_back(bottom_center, rings.front()[next], rings.front()[vertex_idx]);
+        facets.emplace_back(top_center, rings.back()[vertex_idx], rings.back()[next]);
+    }
+
+    return mesh;
+}
+
 static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>& speeds, double facet_angle)
 {
     static constexpr double body_radius    = 18.0;
@@ -16875,6 +16951,38 @@ static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>&
     for (size_t level_idx = 0; level_idx < speeds.size(); ++level_idx) {
         const double center_z = base_height + level_idx * section_height + section_height * 0.5;
         scarf_calib_add_speed_label(mesh, speeds[level_idx], center_z, body_radius);
+    }
+
+    return TriangleMesh(std::move(mesh));
+}
+
+static TriangleMesh scarf_calib_make_conditional_tower_mesh(const std::vector<double>& thresholds, double facet_angle)
+{
+    static constexpr double body_radius    = 18.0;
+    static constexpr double section_height = 10.0;
+    static constexpr double base_height    = 1.2;
+    static constexpr double band_radius    = body_radius + 0.9;
+    static constexpr double slope_height   = 2.0;
+
+    const size_t level_count = std::max<size_t>(thresholds.size(), 1);
+    const std::vector<Vec2f> profile = {
+        Vec2f(-12.7f, -12.7f),
+        Vec2f(  0.0f, -18.0f),
+        Vec2f( 12.7f, -12.7f),
+        Vec2f( 18.0f,   0.0f),
+        Vec2f( 12.7f,  12.7f),
+        Vec2f(  0.0f,  18.0f),
+        Vec2f(-12.7f,  12.7f),
+        Vec2f(-18.0f,   0.0f),
+    };
+
+    indexed_triangle_set mesh;
+    its_merge(mesh, its_make_cylinder(band_radius, base_height, facet_angle));
+    its_merge(mesh, scarf_calib_make_sloped_profile_tower_body(profile, body_radius, level_count, section_height, slope_height, base_height));
+
+    for (size_t level_idx = 0; level_idx < thresholds.size(); ++level_idx) {
+        const double center_z = base_height + level_idx * section_height + section_height * 0.5;
+        scarf_calib_add_speed_label(mesh, thresholds[level_idx], center_z, body_radius);
     }
 
     return TriangleMesh(std::move(mesh));
