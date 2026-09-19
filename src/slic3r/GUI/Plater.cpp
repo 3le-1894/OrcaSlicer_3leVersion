@@ -16429,6 +16429,7 @@ void Plater::calib_fan_speed(const Calib_Params& params)
 }
 
 static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>& speeds, double facet_angle = PI / 48.0);
+static TriangleMesh scarf_calib_make_length_steps_tower_mesh(const std::vector<double>& lengths, double facet_angle = PI / 48.0);
 static TriangleMesh scarf_calib_make_conditional_tower_mesh(const std::vector<double>& thresholds, double facet_angle = PI / 48.0);
 
 void Plater::calib_scarf_joint_speed(const Calib_Params& params)
@@ -16543,7 +16544,7 @@ void Plater::calib_scarf_length_steps(const Calib_Params& params)
     print_config->set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(100, true));
 
     std::string name = "Scarf Length Steps";
-    ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_speed_tower_mesh(lengths));
+    ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_length_steps_tower_mesh(lengths));
     obj->name = name;
     obj->config.set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
     obj->config.set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
@@ -16951,6 +16952,39 @@ static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>&
     for (size_t level_idx = 0; level_idx < speeds.size(); ++level_idx) {
         const double center_z = base_height + level_idx * section_height + section_height * 0.5;
         scarf_calib_add_speed_label(mesh, speeds[level_idx], center_z, body_radius);
+    }
+
+    return TriangleMesh(std::move(mesh));
+}
+
+static TriangleMesh scarf_calib_make_length_steps_tower_mesh(const std::vector<double>& lengths, double facet_angle)
+{
+    static constexpr double body_radius    = 18.0;
+    static constexpr double section_height = 10.0;
+    static constexpr double base_height    = 1.2;
+    static constexpr double band_radius    = body_radius + 0.9;
+    static constexpr double slope_height   = 2.0;
+
+    const size_t level_count = std::max<size_t>(lengths.size(), 1);
+    const std::vector<Vec2f> profile = {
+        Vec2f(-18.0f, -10.0f),
+        Vec2f(-10.0f, -18.0f),
+        Vec2f( 10.0f, -18.0f),
+        Vec2f( 18.0f, -10.0f),
+        Vec2f( 18.0f,  10.0f),
+        Vec2f( 10.0f,  18.0f),
+        Vec2f(-10.0f,  18.0f),
+        Vec2f(-18.0f,  10.0f),
+    };
+
+    indexed_triangle_set mesh;
+    its_merge(mesh, its_make_cylinder(band_radius, base_height, facet_angle));
+    its_merge(mesh, scarf_calib_make_sloped_profile_tower_body(profile, body_radius, level_count, section_height, slope_height, base_height));
+
+    // Raised front labels make each length section readable after slicing and printing.
+    for (size_t level_idx = 0; level_idx < lengths.size(); ++level_idx) {
+        const double center_z = base_height + level_idx * section_height + section_height * 0.5;
+        scarf_calib_add_speed_label(mesh, lengths[level_idx], center_z, body_radius);
     }
 
     return TriangleMesh(std::move(mesh));
