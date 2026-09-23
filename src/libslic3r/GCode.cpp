@@ -5661,10 +5661,25 @@ LayerResult GCode::process_layer(
         }
         case CalibMode::Calib_Fan_Speed_Tower:
         case CalibMode::Calib_Bridge_Cooling: {
-            const float fan_speed = std::clamp(this->interpolate_value_across_layers(static_cast<float>(print.calib_params().start),
-                                                                                     static_cast<float>(print.calib_params().end),
-                                                                                     static_cast<float>(print.calib_params().step)),
-                                               0.0f, 100.0f);
+            const Calib_Params& calib = print.calib_params();
+            float fan_speed;
+            if (print.calib_mode() == CalibMode::Calib_Fan_Speed_Tower && calib.fan_speed_section_height > 0.0) {
+                // The fan tower uses fixed-height model sections. Map fan changes to their
+                // physical Z boundaries, not a fraction of total layers (which shifts when
+                // a base is added beneath the sections).
+                const double z_from_tower_base = print_z - calib.fan_speed_base_height;
+                const int section = z_from_tower_base <= 0.0 ? 0 :
+                    static_cast<int>(std::floor(z_from_tower_base / calib.fan_speed_section_height + 1e-5));
+                const int section_count = std::lround(std::abs(calib.end - calib.start) / calib.step) + 1;
+                const int clamped_section = std::clamp(section, 0, std::max(section_count - 1, 0));
+                const float direction = calib.end >= calib.start ? 1.0f : -1.0f;
+                fan_speed = static_cast<float>(calib.start + direction * clamped_section * calib.step);
+            } else {
+                fan_speed = this->interpolate_value_across_layers(static_cast<float>(calib.start),
+                                                                    static_cast<float>(calib.end),
+                                                                    static_cast<float>(calib.step));
+            }
+            fan_speed = std::clamp(fan_speed, 0.0f, 100.0f);
             sprintf(buf, "; Calib_Fan_Speed_Tower: Z_HEIGHT: %g, fan_speed:%g%%\n", print_z, fan_speed);
             gcode += buf;
             gcode += writer().set_fan(static_cast<unsigned int>(std::round(fan_speed)));
@@ -5708,6 +5723,16 @@ LayerResult GCode::process_layer(
             gcode += buf;
             m_calib_config.set_key_value("role_based_wipe_speed", new ConfigOptionBool(false));
             m_calib_config.set_key_value("wipe_speed", new ConfigOptionFloatOrPercent(std::round(wipe_speed), false));
+            break;
+        }
+        case CalibMode::Calib_Scarf_Seam_Gap: {
+            const float seam_gap = std::clamp(this->interpolate_value_across_layers(static_cast<float>(print.calib_params().start),
+                                                                                     static_cast<float>(print.calib_params().end),
+                                                                                     static_cast<float>(print.calib_params().step)),
+                                               0.0f, 100.0f);
+            sprintf(buf, "; Calib_Scarf_Seam_Gap: Z_HEIGHT: %g, seam_gap:%g%%\n", print_z, seam_gap);
+            gcode += buf;
+            m_calib_config.set_key_value("seam_gap", new ConfigOptionFloatOrPercent(std::round(seam_gap), true));
             break;
         }
         case CalibMode::Calib_Vol_speed_Tower: {

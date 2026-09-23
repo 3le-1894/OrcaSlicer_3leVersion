@@ -15897,6 +15897,9 @@ void Plater::_calib_pa_select_added_objects() {
 
 // Adjust settings for flowrate calibration
 // For linear mode, pass 1 means normal version while pass 2 mean "for perfectionists" version
+static indexed_triangle_set bridge_calib_make_box(double x, double y, double z, double width, double depth, double height);
+static std::array<bool, 7> scarf_calib_digit_segments(char digit);
+
 // ORCA: Add pattern parameter
 void adjust_settings_for_flowrate_calib(ModelObjectPtrs& objects, bool linear, int pass, InfillPattern pattern)
 {
@@ -16017,15 +16020,55 @@ void adjust_settings_for_flowrate_calib(ModelObjectPtrs& objects, bool linear, i
 }
 
 // ORCA: Add pattern parameter
-void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern) {
-    if (pass != 1 && pass != 2)
+static TriangleMesh make_flow_ratio_disk_mesh(double flow_ratio)
+{
+    static constexpr double disk_radius = 15.0;
+    static constexpr double disk_height = 3.0;
+    static constexpr double facet_angle = PI / 48.0;
+    static constexpr double stroke      = 0.8;
+    static constexpr double digit_w     = 3.0;
+    static constexpr double digit_h     = 5.5;
+    static constexpr double digit_gap   = 0.8;
+
+    indexed_triangle_set mesh = its_make_cylinder(disk_radius, disk_height, facet_angle);
+    const std::string label = into_u8(wxString::Format("%.2f", flow_ratio));
+    const double label_width = label.size() * digit_w + (label.size() - 1) * digit_gap;
+    const double start_x = -label_width * 0.5;
+    const double y = -digit_h * 0.5;
+
+    auto add_segment = [&](double x, double yy, double width, double depth) {
+        its_merge(mesh, bridge_calib_make_box(x, yy, disk_height, width, depth, stroke));
+    };
+    for (size_t i = 0; i < label.size(); ++i) {
+        const char c = label[i];
+        const double x = start_x + i * (digit_w + digit_gap);
+        if (c == '.') {
+            add_segment(x, y, stroke, stroke);
+            continue;
+        }
+        const auto segments = scarf_calib_digit_segments(c);
+        if (segments[0]) add_segment(x, y + digit_h - stroke, digit_w, stroke);
+        if (segments[3]) add_segment(x, y, digit_w, stroke);
+        if (segments[6]) add_segment(x, y + (digit_h - stroke) * 0.5, digit_w, stroke);
+        if (segments[1]) add_segment(x + digit_w - stroke, y + digit_h * 0.5, stroke, digit_h * 0.5);
+        if (segments[2]) add_segment(x + digit_w - stroke, y, stroke, digit_h * 0.5);
+        if (segments[5]) add_segment(x, y + digit_h * 0.5, stroke, digit_h * 0.5);
+        if (segments[4]) add_segment(x, y, stroke, digit_h * 0.5);
+    }
+    return TriangleMesh(std::move(mesh));
+}
+
+void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern, double ellis_start, double ellis_end, double ellis_step) {
+    if (pass != 0 && pass != 1 && pass != 2)
         return;
     wxString calib_name;
     if (is_linear) {
         calib_name = L"Orca YOLO Flow Calibration";
         if (pass == 2)
             calib_name += L" - Perfectionist version";
-    } else
+    } else if (pass == 0)
+        calib_name = L"Ellis Extrusion Multiplier";
+    else
         calib_name = wxString::Format(L"Flowrate Test - Pass%d", pass);
 
     if (new_project(false, false, calib_name) == wxID_CANCEL)
@@ -16040,6 +16083,56 @@ void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern) {
         else
             add_model(false,
                       (boost::filesystem::path(Slic3r::resources_dir()) / "calib" / "filament_flow" / "Orca-LinearFlow_fine.3mf").string());
+    } else if (pass == 0) {
+        // Use a single plate of labeled 30 mm x 3 mm disks for flow-ratio calibration.
+        const double first_ratio = ellis_start;
+        const double ratio_step  = std::abs(ellis_step);
+        const auto print_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        const auto *layer_height_opt = print_config->option<ConfigOptionFloat>("layer_height");
+        const auto *first_layer_height_opt = print_config->option<ConfigOptionFloat>("initial_layer_print_height");
+        const double layer_height = layer_height_opt ? std::max(layer_height_opt->value, 0.01) : 0.2;
+        const double first_layer_height = first_layer_height_opt ? std::max(first_layer_height_opt->value, 0.01) : layer_height;
+        const int total_layers = std::max(1, 1 + int(std::ceil((3.0 - first_layer_height) / layer_height)));
+        // Leave two complete layers for sparse infill between the two bottom
+        // layers and the top shell. The slicer reserves one additional shell
+        // transition layer, so subtract three here to produce two visible
+        // sparse-infill layers in the sliced disk.
+        const int top_layers = std::max(1, total_layers - 2 - 3);
+        print_config->set_key_value("top_shell_layers", new ConfigOptionInt(top_layers));
+        print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(2));
+        print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(30));
+        print_config->set_key_value("top_surface_line_width", new ConfigOptionFloatOrPercent(100, true));
+        print_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats({0.0}));
+
+        auto first_plate = get_partplate_list().get_plate(0);
+        if (!first_plate)
+            get_partplate_list().create_plate();
+        first_plate = get_partplate_list().get_plate(0);
+        if (!first_plate)
+            return;
+        const Vec3d plate_origin = first_plate->get_origin();
+        std::vector<size_t> object_idxs;
+        for (double flow_ratio = first_ratio; flow_ratio >= ellis_end - 1e-6; flow_ratio -= ratio_step) {
+            const std::string name = into_u8(wxString::Format("Flow Ratio %.2f", flow_ratio));
+            ModelObject *obj = model().add_object(name.c_str(), "", make_flow_ratio_disk_mesh(flow_ratio));
+            obj->name = name;
+            obj->config.set_key_value("print_flow_ratio", new ConfigOptionFloat(flow_ratio));
+            obj->config.set_key_value("bottom_shell_layers", new ConfigOptionInt(2));
+            obj->config.set_key_value("top_shell_layers", new ConfigOptionInt(top_layers));
+            obj->config.set_key_value("sparse_infill_density", new ConfigOptionPercent(30));
+            obj->config.set_key_value("top_surface_line_width", new ConfigOptionFloatOrPercent(100, true));
+            if (obj->instances.empty())
+                obj->add_instance();
+            const size_t index = object_idxs.size();
+            obj->instances[0]->set_offset(plate_origin + Vec3d((index % 3) * 36.0 - 36.0, (index / 3) * 36.0 - 18.0, 0.0));
+            const size_t obj_idx = model().objects.size() - 1;
+            object_idxs.emplace_back(obj_idx);
+            get_partplate_list().add_to_plate(obj_idx, 0, 0);
+            sidebar().obj_list()->add_object_to_list(obj_idx);
+        }
+        changed_objects(object_idxs);
+        arrange();
+        return;
     } else {
         if (pass == 1)
             add_model(false,
@@ -16379,17 +16472,23 @@ void Plater::calib_fan_speed(const Calib_Params& params)
         return;
 
     auto print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
-    auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
     auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
 
     auto obj = model().objects[0];
-    auto base_bb = obj->bounding_box_exact();
+    // Use the object's un-translated mesh bounds here. bounding_box_exact() includes the
+    // instance's plate-position offset, but the added base mesh is in object coordinates;
+    // mixing those coordinate spaces places the base far from the tower.
+    auto base_bb = obj->raw_mesh_bounding_box();
     const double module_height = std::max(base_bb.size().z(), 0.1);
     const int module_count = std::max(1, static_cast<int>(std::lround(std::abs(params.end - params.start) / params.step)) + 1);
 
+    // Place a solid 20 x 20 x 3 mm base immediately below the original tower. Keeping
+    // the tower meshes unshifted preserves their section-to-section spacing; ensure_on_bed()
+    // will lift the complete object so the base sits on the plate.
+    const size_t base_volume_count = obj->volumes.size();
+
     // Treat the loaded STEP as one fan-speed module and stack enough copies to match the requested fan-speed steps.
     // This turns a single overhang test module into a full tower without requiring a separate model asset for each range.
-    const size_t base_volume_count = obj->volumes.size();
     for (int module_idx = 1; module_idx < module_count; ++module_idx) {
         for (size_t volume_idx = 0; volume_idx < base_volume_count; ++volume_idx) {
             ModelVolume* volume = obj->add_volume(*obj->volumes[volume_idx]);
@@ -16398,13 +16497,13 @@ void Plater::calib_fan_speed(const Calib_Params& params)
         }
     }
 
+    indexed_triangle_set base_mesh = bridge_calib_make_box(base_bb.center().x() - 10.0, base_bb.center().y() - 10.0, base_bb.min.z() - 3.0, 20.0, 20.0, 3.0);
+    obj->add_volume(TriangleMesh(std::move(base_mesh)), ModelVolumeType::MODEL_PART, false);
+    obj->invalidate_bounding_box();
+
     obj->ensure_on_bed();
 
     printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
-    filament_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_min_speed", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_for_layer_cooling", new ConfigOptionBools{false});
-    set_config_values<bool, ConfigOptionBoolsNullable>(print_config, "enable_overhang_speed", false);
     print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
     print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
     print_config->set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
@@ -16421,11 +16520,12 @@ void Plater::calib_fan_speed(const Calib_Params& params)
 
     changed_objects({ 0 });
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_ui_from_settings();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_ui_from_settings();
 
-    p->background_process.fff_print()->set_calib_params(params);
+    Calib_Params fan_calib_params = params;
+    fan_calib_params.fan_speed_base_height = 3.0;
+    fan_calib_params.fan_speed_section_height = module_height;
+    p->background_process.fff_print()->set_calib_params(fan_calib_params);
 }
 
 static TriangleMesh scarf_calib_make_speed_tower_mesh(const std::vector<double>& speeds, double facet_angle = PI / 48.0);
@@ -16447,16 +16547,11 @@ void Plater::calib_scarf_joint_speed(const Calib_Params& params)
         return;
 
     auto print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
-    auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
     auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
 
     printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
-    filament_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_min_speed", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_for_layer_cooling", new ConfigOptionBools{false});
     print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
     print_config->set_key_value("enable_support", new ConfigOptionBool(false));
-    set_config_values<bool, ConfigOptionBoolsNullable>(print_config, "enable_overhang_speed", false);
     print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
     print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
     print_config->set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
@@ -16492,10 +16587,8 @@ void Plater::calib_scarf_joint_speed(const Calib_Params& params)
 
     changed_objects({ obj_idx });
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->reload_config();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
 
     p->background_process.fff_print()->set_calib_params(params);
@@ -16516,16 +16609,11 @@ void Plater::calib_scarf_length_steps(const Calib_Params& params)
         return;
 
     auto print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
-    auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
     auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
 
     printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
-    filament_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_min_speed", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_for_layer_cooling", new ConfigOptionBools{false});
     print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
     print_config->set_key_value("enable_support", new ConfigOptionBool(false));
-    set_config_values<bool, ConfigOptionBoolsNullable>(print_config, "enable_overhang_speed", false);
     print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
     print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
     print_config->set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
@@ -16541,7 +16629,6 @@ void Plater::calib_scarf_length_steps(const Calib_Params& params)
     print_config->set_key_value("seam_slope_min_length", new ConfigOptionFloat(params.start));
     print_config->set_key_value("seam_slope_steps", new ConfigOptionInt(params.scarf_steps));
     print_config->set_key_value("scarf_joint_flow_ratio", new ConfigOptionFloat(1.0));
-    print_config->set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(100, true));
 
     std::string name = "Scarf Length Steps";
     ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_length_steps_tower_mesh(lengths));
@@ -16563,10 +16650,8 @@ void Plater::calib_scarf_length_steps(const Calib_Params& params)
 
     changed_objects({ obj_idx });
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->reload_config();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
 
     p->background_process.fff_print()->set_calib_params(params);
@@ -16587,16 +16672,11 @@ void Plater::calib_scarf_conditional(const Calib_Params& params)
         return;
 
     auto print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
-    auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
     auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
 
     printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
-    filament_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_min_speed", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_for_layer_cooling", new ConfigOptionBools{false});
     print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
     print_config->set_key_value("enable_support", new ConfigOptionBool(false));
-    set_config_values<bool, ConfigOptionBoolsNullable>(print_config, "enable_overhang_speed", false);
     print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
     print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
     print_config->set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
@@ -16613,7 +16693,6 @@ void Plater::calib_scarf_conditional(const Calib_Params& params)
     print_config->set_key_value("scarf_angle_threshold", new ConfigOptionInt(static_cast<int>(std::round(params.start))));
     print_config->set_key_value("seam_slope_min_length", new ConfigOptionFloat(20.0));
     print_config->set_key_value("scarf_joint_flow_ratio", new ConfigOptionFloat(1.0));
-    print_config->set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(100, true));
 
     std::string name = "Conditional Scarf Joint";
     ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_conditional_tower_mesh(thresholds));
@@ -16636,10 +16715,8 @@ void Plater::calib_scarf_conditional(const Calib_Params& params)
 
     changed_objects({ obj_idx });
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->reload_config();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
 
     p->background_process.fff_print()->set_calib_params(params);
@@ -16660,16 +16737,11 @@ void Plater::calib_scarf_wipe_speed(const Calib_Params& params)
         return;
 
     auto print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
-    auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
     auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
 
     printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
-    filament_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_min_speed", new ConfigOptionFloats { 0.0 });
-    filament_config->set_key_value("slow_down_for_layer_cooling", new ConfigOptionBools{false});
     print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
     print_config->set_key_value("enable_support", new ConfigOptionBool(false));
-    set_config_values<bool, ConfigOptionBoolsNullable>(print_config, "enable_overhang_speed", false);
     print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
     print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
     print_config->set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
@@ -16684,7 +16756,6 @@ void Plater::calib_scarf_wipe_speed(const Calib_Params& params)
     print_config->set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
     print_config->set_key_value("seam_slope_min_length", new ConfigOptionFloat(20.0));
     print_config->set_key_value("scarf_joint_flow_ratio", new ConfigOptionFloat(1.0));
-    print_config->set_key_value("scarf_joint_speed", new ConfigOptionFloatOrPercent(100, true));
     print_config->set_key_value("role_based_wipe_speed", new ConfigOptionBool(false));
     print_config->set_key_value("wipe_speed", new ConfigOptionFloatOrPercent(params.start, false));
 
@@ -16708,12 +16779,71 @@ void Plater::calib_scarf_wipe_speed(const Calib_Params& params)
 
     changed_objects({ obj_idx });
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
     wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->reload_config();
     wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
 
+    p->background_process.fff_print()->set_calib_params(params);
+}
+
+void Plater::calib_scarf_seam_gap(const Calib_Params& params)
+{
+    const auto test_name = wxString::Format(L"Scarf Seam Gap Test");
+    new_project(false, false, test_name);
+    wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
+    if (params.mode != CalibMode::Calib_Scarf_Seam_Gap)
+        return;
+
+    std::vector<double> gaps;
+    for (double gap = params.start; gap <= params.end + 0.001; gap += params.step)
+        gaps.emplace_back(gap);
+    if (gaps.empty())
+        return;
+
+    auto print_config    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
+
+    printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
+    print_config->set_key_value("print_sequence", new ConfigOptionEnum(PrintSequence::ByLayer));
+    print_config->set_key_value("enable_support", new ConfigOptionBool(false));
+    print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));
+    print_config->set_key_value("wall_loops", new ConfigOptionInt(2));
+    print_config->set_key_value("alternate_extra_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("top_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(3));
+    print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(10));
+    print_config->set_key_value("detect_thin_wall", new ConfigOptionBool(false));
+    print_config->set_key_value("spiral_mode", new ConfigOptionBool(false));
+    print_config->set_key_value("enable_wrapping_detection", new ConfigOptionBool(false));
+    print_config->set_key_value("precise_z_height", new ConfigOptionBool(false));
+    print_config->set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
+    print_config->set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
+    print_config->set_key_value("seam_slope_min_length", new ConfigOptionFloat(20.0));
+    print_config->set_key_value("scarf_joint_flow_ratio", new ConfigOptionFloat(1.0));
+    print_config->set_key_value("seam_gap", new ConfigOptionFloatOrPercent(params.start, true));
+
+    std::string name = "Scarf Seam Gap";
+    ModelObject* obj = model().add_object(name.c_str(), "", scarf_calib_make_speed_tower_mesh(gaps));
+    obj->name = name;
+    obj->config.set_key_value("seam_position", new ConfigOptionEnum<SeamPosition>(spRear));
+    obj->config.set_key_value("seam_slope_type", new ConfigOptionEnum<SeamScarfType>(SeamScarfType::External));
+    obj->config.set_key_value("seam_slope_min_length", new ConfigOptionFloat(20.0));
+    obj->config.set_key_value("seam_gap", new ConfigOptionFloatOrPercent(params.start, true));
+    obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
+    obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
+    obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
+    if (obj->instances.empty())
+        obj->add_instance();
+    obj->ensure_on_bed();
+
+    const size_t obj_idx = model().objects.size() - 1;
+    get_partplate_list().add_to_plate(obj_idx, 0, 0);
+    sidebar().obj_list()->add_object_to_list(obj_idx);
+    changed_objects({ obj_idx });
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
     p->background_process.fff_print()->set_calib_params(params);
 }
 

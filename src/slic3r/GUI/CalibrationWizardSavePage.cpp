@@ -65,6 +65,9 @@ static wxString get_default_name(wxString filament_name, CalibMode mode){
     case Slic3r::CalibMode::Calib_Scarf_Wipe_Speed:
         filament_name += " Scarf Seam Wipe Speed Calibrated";
         break;
+    case Slic3r::CalibMode::Calib_Scarf_Seam_Gap:
+        filament_name += " Scarf Seam Gap Calibrated";
+        break;
     case Slic3r::CalibMode::Calib_Retraction_tower:
         break;
     case Slic3r::CalibMode::Calib_Input_shaping_freq:

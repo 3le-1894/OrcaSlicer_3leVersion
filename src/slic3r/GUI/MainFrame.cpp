@@ -3549,6 +3549,40 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
+    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Ellis Extrusion Multiplier"), _L("Ellis Extrusion Multiplier"),
+        [this](wxCommandEvent&) {
+            if (!m_plater)
+                return;
+            wxDialog dlg(this, wxID_ANY, _L("Ellis Extrusion Multiplier"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE);
+            auto *sizer = new wxBoxSizer(wxVERTICAL);
+            auto *grid = new wxFlexGridSizer(2, FromDIP(8), FromDIP(8));
+            auto add_field = [&](const wxString& label, const wxString& value) {
+                grid->Add(new wxStaticText(&dlg, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL);
+                auto *ctrl = new wxTextCtrl(&dlg, wxID_ANY, value);
+                grid->Add(ctrl, 1, wxEXPAND);
+                return ctrl;
+            };
+            auto *start_ctrl = add_field(_L("Starting flow"), "1.00");
+            auto *end_ctrl = add_field(_L("Ending flow"), "0.90");
+            auto *step_ctrl = add_field(_L("Step"), "0.02");
+            grid->AddGrowableCol(1);
+            sizer->Add(grid, 1, wxALL | wxEXPAND, FromDIP(12));
+            auto *buttons = dlg.CreateStdDialogButtonSizer(wxOK | wxCANCEL);
+            sizer->Add(buttons, 0, wxALL | wxALIGN_RIGHT, FromDIP(8));
+            dlg.SetSizerAndFit(sizer);
+            if (dlg.ShowModal() != wxID_OK)
+                return;
+            double start = 0.0, end = 0.0, step = 0.0;
+            if (!start_ctrl->GetValue().ToDouble(&start) || !end_ctrl->GetValue().ToDouble(&end) ||
+                !step_ctrl->GetValue().ToDouble(&step) || start <= end || step <= 0.0 || end <= 0.0) {
+                wxMessageBox(_L("Enter valid values where starting flow is greater than ending flow and step is positive."),
+                             _L("Invalid Ellis settings"), wxOK | wxICON_WARNING, this);
+                return;
+            }
+            CallAfter([this, start, end, step]() { m_plater->calib_flowrate(false, 0, ipArchimedeanChords, start, end, step); });
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+
     m_topbar->GetCalibMenu()->AppendSeparator();
 
     // Retraction
@@ -3568,6 +3602,13 @@ void MainFrame::init_menubar_as_editor()
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
     auto scarf_seam_menu = new wxMenu();
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Seam Gap"), _L("Scarf Seam Gap"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfSeamGap_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
     append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Joint Speed"), _L("Scarf Joint Speed"),
         [this](wxCommandEvent&) {
             auto dlg = new ScarfJointSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
@@ -3762,6 +3803,39 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
+    append_menu_item(calib_menu, wxID_ANY, _L("Ellis Extrusion Multiplier"), _L("Ellis Extrusion Multiplier"),
+        [this](wxCommandEvent&) {
+            if (!m_plater)
+                return;
+            wxDialog dlg(this, wxID_ANY, _L("Ellis Extrusion Multiplier"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE);
+            auto *sizer = new wxBoxSizer(wxVERTICAL);
+            auto *grid = new wxFlexGridSizer(2, FromDIP(8), FromDIP(8));
+            auto add_field = [&](const wxString& label, const wxString& value) {
+                grid->Add(new wxStaticText(&dlg, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL);
+                auto *ctrl = new wxTextCtrl(&dlg, wxID_ANY, value);
+                grid->Add(ctrl, 1, wxEXPAND);
+                return ctrl;
+            };
+            auto *start_ctrl = add_field(_L("Starting flow"), "1.00");
+            auto *end_ctrl = add_field(_L("Ending flow"), "0.90");
+            auto *step_ctrl = add_field(_L("Step"), "0.02");
+            grid->AddGrowableCol(1);
+            sizer->Add(grid, 1, wxALL | wxEXPAND, FromDIP(12));
+            sizer->Add(dlg.CreateStdDialogButtonSizer(wxOK | wxCANCEL), 0, wxALL | wxALIGN_RIGHT, FromDIP(8));
+            dlg.SetSizerAndFit(sizer);
+            if (dlg.ShowModal() != wxID_OK)
+                return;
+            double start = 0.0, end = 0.0, step = 0.0;
+            if (!start_ctrl->GetValue().ToDouble(&start) || !end_ctrl->GetValue().ToDouble(&end) ||
+                !step_ctrl->GetValue().ToDouble(&step) || start <= end || step <= 0.0 || end <= 0.0) {
+                wxMessageBox(_L("Enter valid values where starting flow is greater than ending flow and step is positive."),
+                             _L("Invalid Ellis settings"), wxOK | wxICON_WARNING, this);
+                return;
+            }
+            CallAfter([this, start, end, step]() { m_plater->calib_flowrate(false, 0, ipArchimedeanChords, start, end, step); });
+        }, "", nullptr,
+        [this]() {return m_plater->is_view3D_shown();; }, this);
+
     calib_menu->AppendSeparator();
 
     // Retraction
@@ -3781,6 +3855,13 @@ void MainFrame::init_menubar_as_editor()
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
     auto scarf_seam_menu = new wxMenu();
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Seam Gap"), _L("Scarf Seam Gap"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfSeamGap_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
     append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Joint Speed"), _L("Scarf Joint Speed"),
         [this](wxCommandEvent&) {
             auto dlg = new ScarfJointSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);

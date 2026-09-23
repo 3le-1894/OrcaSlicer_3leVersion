@@ -34,7 +34,8 @@ enum class CalibMode : int {
     Calib_Retraction_tower,
     Calib_Input_shaping_freq,
     Calib_Input_shaping_damp,
-    Calib_Cornering
+    Calib_Cornering,
+    Calib_Scarf_Seam_Gap
 };
 
 enum class CalibState { Start = 0, Preset, Calibration, CoarseSave, FineCalibration, Save, Finish };
@@ -63,6 +64,9 @@ struct Calib_Params
     // Scale the calibration model to the nozzle diameter and set the layer height accordingly (temp tower / VFA).
     // When false the 0.4 mm / 0.2 mm reference model is printed as-is.
     bool nozzle_based_resize = true;
+    // Optional physical Z calibration for fan-speed towers with a base and fixed-height sections.
+    double fan_speed_base_height = 0.0;
+    double fan_speed_section_height = 0.0;
 
     CalibMode mode;
 };
