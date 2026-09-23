@@ -3602,13 +3602,6 @@ void MainFrame::init_menubar_as_editor()
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
     auto scarf_seam_menu = new wxMenu();
-    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Seam Gap"), _L("Scarf Seam Gap"),
-        [this](wxCommandEvent&) {
-            auto dlg = new ScarfSeamGap_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        },
-        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
     append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Joint Speed"), _L("Scarf Joint Speed"),
         [this](wxCommandEvent&) {
             auto dlg = new ScarfJointSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
@@ -3619,6 +3612,13 @@ void MainFrame::init_menubar_as_editor()
     append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Length / Steps"), _L("Scarf Length / Steps"),
         [this](wxCommandEvent&) {
             auto dlg = new ScarfLengthSteps_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Seam Gap"), _L("Scarf Seam Gap"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfSeamGap_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         },
@@ -3855,13 +3855,6 @@ void MainFrame::init_menubar_as_editor()
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
     auto scarf_seam_menu = new wxMenu();
-    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Seam Gap"), _L("Scarf Seam Gap"),
-        [this](wxCommandEvent&) {
-            auto dlg = new ScarfSeamGap_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
-            dlg->ShowModal();
-            dlg->Destroy();
-        },
-        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
     append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Joint Speed"), _L("Scarf Joint Speed"),
         [this](wxCommandEvent&) {
             auto dlg = new ScarfJointSpeed_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
@@ -3872,6 +3865,13 @@ void MainFrame::init_menubar_as_editor()
     append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Length / Steps"), _L("Scarf Length / Steps"),
         [this](wxCommandEvent&) {
             auto dlg = new ScarfLengthSteps_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
+            dlg->ShowModal();
+            dlg->Destroy();
+        },
+        "", nullptr, [this]() {return m_plater->is_view3D_shown();; }, this);
+    append_menu_item(scarf_seam_menu, wxID_ANY, _L("Scarf Seam Gap"), _L("Scarf Seam Gap"),
+        [this](wxCommandEvent&) {
+            auto dlg = new ScarfSeamGap_Test_Dlg((wxWindow*)this, wxID_ANY, m_plater);
             dlg->ShowModal();
             dlg->Destroy();
         },
