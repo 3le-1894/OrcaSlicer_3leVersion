@@ -12870,7 +12870,13 @@ void Plater::priv::on_action_export_sliced_file(SimpleEvent&)
 {
     if (q != nullptr) {
         BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << ":received export sliced file event\n" ;
-        q->export_gcode_3mf();
+        // The selected printer controls the format of a single sliced-plate export.
+        // Check it here as the setting may have changed since the export action was selected.
+        const auto& printer_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
+        if (printer_config.opt_bool("use_3mf"))
+            q->export_gcode_3mf();
+        else
+            q->export_gcode(false);
     }
 }
 
@@ -19022,6 +19028,24 @@ void Plater::send_to_printer(bool isall)
     p->on_action_send_to_printer(isall);
 }
 
+static fs::path normalize_gcode_3mf_export_path(const fs::path& path)
+{
+    std::string filename = path.filename().string();
+    // A project or the save dialog may already include the compound extension.
+    // Remove all trailing export extensions before adding exactly one.
+    while (boost::algorithm::iends_with(filename, ".gcode.3mf") ||
+           boost::algorithm::iends_with(filename, ".gcode") ||
+           boost::algorithm::iends_with(filename, ".3mf")) {
+        if (boost::algorithm::iends_with(filename, ".gcode.3mf"))
+            filename.resize(filename.size() - std::string(".gcode.3mf").size());
+        else if (boost::algorithm::iends_with(filename, ".gcode"))
+            filename.resize(filename.size() - std::string(".gcode").size());
+        else
+            filename.resize(filename.size() - std::string(".3mf").size());
+    }
+    return filename.empty() ? path : path.parent_path() / (filename + ".gcode.3mf");
+}
+
 //BBS export gcode 3mf to file
 void Plater::export_gcode_3mf(bool export_all)
 {
@@ -19053,26 +19077,38 @@ void Plater::export_gcode_3mf(bool export_all)
         show_error(this, ex.what(), false);
         return;
     }
-    default_output_file.replace_extension(".gcode.3mf");
+    default_output_file = normalize_gcode_3mf_export_path(default_output_file);
     default_output_file = fs::path(Slic3r::fold_utf8_to_ascii(default_output_file.string()));
 
     //Get a last save path
     start_dir = appconfig.get_last_output_dir(default_output_file.parent_path().string(), false);
 
+    // On Windows the save dialog appends its compound wildcard extension to the
+    // initial filename. Supplying ".gcode.3mf" here makes it appear twice before
+    // the user even saves, so give the dialog only the base name.
+    fs::path suggested_filename = default_output_file.filename();
+    suggested_filename.replace_extension(""); // .3mf
+    suggested_filename.replace_extension(""); // .gcode
+
     fs::path output_path;
     {
-        std::string ext = default_output_file.extension().string();
         wxFileDialog dlg(this, _L("Save Sliced file as:"),
             start_dir,
-            from_path(default_output_file.filename()),
+            from_path(suggested_filename),
             GUI::file_wildcards(FT_GCODE_3MF, ""),
             wxFD_SAVE | wxFD_OVERWRITE_PROMPT
         );
         if (dlg.ShowModal() == wxID_OK) {
-            output_path = into_path(dlg.GetPath());
-            ext = output_path.extension().string();
-            if (ext != ".3mf")
-                output_path = output_path.string() + ".3mf";
+            const fs::path selected_path = into_path(dlg.GetPath());
+            output_path = normalize_gcode_3mf_export_path(selected_path);
+            // The dialog only checks its original path for overwrites. If normalization
+            // changes the destination, confirm before replacing an existing file.
+            boost::system::error_code ec;
+            if (output_path != selected_path && fs::exists(output_path, ec) &&
+                MessageDialog(this,
+                              wxString::Format(_L("The file %s already exists.\nDo you want to replace it?"), from_path(output_path)),
+                              _L("Confirm Save As"), wxYES_NO | wxNO_DEFAULT | wxICON_WARNING).ShowModal() != wxID_YES)
+                return;
         }
     }
 
