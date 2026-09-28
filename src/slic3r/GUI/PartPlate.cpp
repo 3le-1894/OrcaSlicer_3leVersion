@@ -187,7 +187,11 @@ void PartPlate::init()
 
 	m_print_index = -1;
 	m_print = nullptr;
-	m_config.option<ConfigOptionEnum<FilamentMapMode>>("filament_map_mode", true)->value = FilamentMapMode::fmmAutoForFlush;
+	FilamentMapMode default_map_mode = FilamentMapMode::fmmAutoForFlush;
+	if (m_plater && wxGetApp().preset_bundle &&
+	    wxGetApp().preset_bundle->printers.get_selected_preset().config.opt_string("printer_model") == "Bambu Lab X2D")
+		default_map_mode = FilamentMapMode::fmmAutoForMatch;
+	m_config.option<ConfigOptionEnum<FilamentMapMode>>("filament_map_mode", true)->value = default_map_mode;
 }
 
 BedType PartPlate::get_bed_type(bool load_from_project) const

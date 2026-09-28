@@ -16028,7 +16028,7 @@ void adjust_settings_for_flowrate_calib(ModelObjectPtrs& objects, bool linear, i
 // ORCA: Add pattern parameter
 static TriangleMesh make_flow_ratio_disk_mesh(double flow_ratio)
 {
-    static constexpr double disk_radius = 15.0;
+    static constexpr double disk_radius = 20.0;
     static constexpr double disk_height = 3.0;
     static constexpr double facet_angle = PI / 48.0;
     static constexpr double stroke      = 0.8;
@@ -16040,7 +16040,8 @@ static TriangleMesh make_flow_ratio_disk_mesh(double flow_ratio)
     const std::string label = into_u8(wxString::Format("%.2f", flow_ratio));
     const double label_width = label.size() * digit_w + (label.size() - 1) * digit_gap;
     const double start_x = -label_width * 0.5;
-    const double y = -digit_h * 0.5;
+    // Center the label in the lower third of the disk, clear of its rim.
+    const double y = -disk_radius * 2.0 / 3.0 - digit_h * 0.5;
 
     auto add_segment = [&](double x, double yy, double width, double depth) {
         its_merge(mesh, bridge_calib_make_box(x, yy, disk_height, width, depth, stroke));
@@ -16090,7 +16091,7 @@ void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern, dou
             add_model(false,
                       (boost::filesystem::path(Slic3r::resources_dir()) / "calib" / "filament_flow" / "Orca-LinearFlow_fine.3mf").string());
     } else if (pass == 0) {
-        // Use a single plate of labeled 30 mm x 3 mm disks for flow-ratio calibration.
+        // Use a single plate of labeled 40 mm x 3 mm disks for flow-ratio calibration.
         const double first_ratio = ellis_start;
         const double ratio_step  = std::abs(ellis_step);
         const auto print_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
@@ -16105,7 +16106,9 @@ void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern, dou
         // sparse-infill layers in the sliced disk.
         const int top_layers = std::max(1, total_layers - 2 - 3);
         print_config->set_key_value("top_shell_layers", new ConfigOptionInt(top_layers));
+        print_config->set_key_value("top_shell_thickness", new ConfigOptionFloat(0));
         print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(2));
+        print_config->set_key_value("bottom_shell_thickness", new ConfigOptionFloat(0));
         print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(30));
         print_config->set_key_value("top_surface_line_width", new ConfigOptionFloatOrPercent(100, true));
         print_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats({0.0}));
@@ -16124,13 +16127,15 @@ void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern, dou
             obj->name = name;
             obj->config.set_key_value("print_flow_ratio", new ConfigOptionFloat(flow_ratio));
             obj->config.set_key_value("bottom_shell_layers", new ConfigOptionInt(2));
+            obj->config.set_key_value("bottom_shell_thickness", new ConfigOptionFloat(0));
             obj->config.set_key_value("top_shell_layers", new ConfigOptionInt(top_layers));
+            obj->config.set_key_value("top_shell_thickness", new ConfigOptionFloat(0));
             obj->config.set_key_value("sparse_infill_density", new ConfigOptionPercent(30));
             obj->config.set_key_value("top_surface_line_width", new ConfigOptionFloatOrPercent(100, true));
             if (obj->instances.empty())
                 obj->add_instance();
             const size_t index = object_idxs.size();
-            obj->instances[0]->set_offset(plate_origin + Vec3d((index % 3) * 36.0 - 36.0, (index / 3) * 36.0 - 18.0, 0.0));
+            obj->instances[0]->set_offset(plate_origin + Vec3d((index % 3) * 46.0 - 46.0, (index / 3) * 46.0 - 23.0, 0.0));
             const size_t obj_idx = model().objects.size() - 1;
             object_idxs.emplace_back(obj_idx);
             get_partplate_list().add_to_plate(obj_idx, 0, 0);
@@ -16488,7 +16493,7 @@ void Plater::calib_fan_speed(const Calib_Params& params)
     const double module_height = std::max(base_bb.size().z(), 0.1);
     const int module_count = std::max(1, static_cast<int>(std::lround(std::abs(params.end - params.start) / params.step)) + 1);
 
-    // Place a solid 20 x 20 x 3 mm base immediately below the original tower. Keeping
+    // Place a solid 50 x 50 x 3 mm base immediately below the original tower. Keeping
     // the tower meshes unshifted preserves their section-to-section spacing; ensure_on_bed()
     // will lift the complete object so the base sits on the plate.
     const size_t base_volume_count = obj->volumes.size();
@@ -16503,7 +16508,7 @@ void Plater::calib_fan_speed(const Calib_Params& params)
         }
     }
 
-    indexed_triangle_set base_mesh = bridge_calib_make_box(base_bb.center().x() - 10.0, base_bb.center().y() - 10.0, base_bb.min.z() - 3.0, 20.0, 20.0, 3.0);
+    indexed_triangle_set base_mesh = bridge_calib_make_box(base_bb.center().x() - 25.0, base_bb.center().y() - 25.0, base_bb.min.z() - 3.0, 50.0, 50.0, 3.0);
     obj->add_volume(TriangleMesh(std::move(base_mesh)), ModelVolumeType::MODEL_PART, false);
     obj->invalidate_bounding_box();
 

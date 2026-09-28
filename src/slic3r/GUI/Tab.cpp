@@ -4541,6 +4541,7 @@ void TabFilament::build()
         optgroup->append_single_option_line("full_fan_speed_layer", "material_cooling#full-fan-speed-at-layer");
 
         optgroup = page->new_optgroup(L("Part cooling fan"), L"param_cooling_part_fan");
+        optgroup->append_single_option_line("reduce_fan_stop_start_freq", "material_cooling#keep-fan-always-on");
         line = { L("Min fan speed threshold"), L("The part cooling fan will run at the minimum fan speed when the estimated layer time is longer than the threshold value. When the layer time is shorter than the threshold, the fan speed will be interpolated between the minimum and maximum fan speed according to layer printing time.") };
         line.label_path = "material_cooling#material-part-cooling-fan";
         line.append_option(optgroup->get_option("fan_min_speed"));
@@ -4551,7 +4552,6 @@ void TabFilament::build()
         line.append_option(optgroup->get_option("fan_max_speed"));
         line.append_option(optgroup->get_option("slow_down_layer_time"));
         optgroup->append_line(line);
-        optgroup->append_single_option_line("reduce_fan_stop_start_freq", "material_cooling#keep-fan-always-on");
         optgroup->append_single_option_line("slow_down_for_layer_cooling", "material_cooling#slow-printing-down-for-better-layer-cooling");
         optgroup->append_single_option_line("dont_slow_down_outer_wall", "material_cooling#dont-slow-down-outer-walls");
         optgroup->append_single_option_line("slow_down_min_speed", "material_cooling#min-print-speed");
