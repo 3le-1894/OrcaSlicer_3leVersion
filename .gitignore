@@ -54,3 +54,5 @@ __pycache__/
 *.pyc
 *.opc
 /.test/
+/resources/cert/printer.cer
+/resources/cert/printer.cer.backup
