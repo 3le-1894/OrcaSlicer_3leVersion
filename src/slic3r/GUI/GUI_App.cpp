@@ -2212,7 +2212,7 @@ void GUI_App::init_networking_callbacks()
                                 // Orca: only update status if same device id
                                 if (m_device_manager->selected_machine != dev_id) return;
 
-                                m_device_manager->set_selected_machine("");
+                                m_device_manager->set_selected_machine("", msg == "5");
                                 wxString text;
                                 if (msg == "5") {
                                     obj->set_access_code("");
@@ -2224,7 +2224,7 @@ void GUI_App::init_networking_callbacks()
                                 }
                                 event.SetInt(-1);
                             } else if (state == ConnectStatus::ConnectStatusLost) {
-                                m_device_manager->set_selected_machine("");
+                                m_device_manager->set_selected_machine("", false);
                                 event.SetInt(-1);
                                 BOOST_LOG_TRIVIAL(info) << "set_on_local_connect_fn: state = lost";
                             } else {
@@ -3948,7 +3948,8 @@ void GUI_App::set_live_printer_agent(std::shared_ptr<IPrinterAgent> agent)
     // a standalone helper. Pass nullptr to clear the selection.
     if (DeviceManager* dev = getDeviceManager())
     {
-        dev->set_selected_machine(""); // why: empty id disconnects and deselects the current machine
+        dev->set_selected_machine("", false); // Keep this instance's preferred device across agent resets.
+        dev->reset_auto_restore();
         m_agent->set_user_selected_machine("");
         // note: belt-and-suspenders (precedent: DeviceManagerRefresher::on_timer)
         dev->OnSelectedMachineLost(); // why: clear stale sidebar sync-status / AMS
@@ -4030,6 +4031,8 @@ void GUI_App::switch_printer_agent()
                     select_machine(effective_agent_id);
             }
         }
+        if (m_device_manager)
+            m_device_manager->load_last_machine();
         return;
     }
 
@@ -4044,6 +4047,8 @@ void GUI_App::switch_printer_agent()
 
     // Auto-switch MachineObject (new agent has empty device_info, so always re-select)
     select_machine(effective_agent_id);
+    if (m_device_manager)
+        m_device_manager->load_last_machine();
 }
 
 void GUI_App::select_machine(const std::string& agent_id)

@@ -560,7 +560,7 @@ void CalibrationPanel::update_all() {
 
     // check valid machine
     if (obj && dev->get_my_machine(obj->get_dev_id()) == nullptr) {
-        dev->set_selected_machine("");
+        dev->set_selected_machine("", false);
         if (m_agent) m_agent->set_user_selected_machine("");
         show_status((int) MONITOR_NO_PRINTER);
         return;

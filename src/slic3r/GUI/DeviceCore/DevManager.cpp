@@ -395,6 +395,7 @@ namespace Slic3r
         catch (...) {
             ;
         }
+        load_last_machine();
     }
 
     MachineObject* DeviceManager::insert_local_device(const BBLocalMachine& machine,
@@ -564,10 +565,12 @@ namespace Slic3r
         }
     }
 
-    bool DeviceManager::set_selected_machine(std::string dev_id)
+    bool DeviceManager::set_selected_machine(std::string dev_id, bool remember_selection)
     {
         BOOST_LOG_TRIVIAL(info) << "set_selected_machine=" << dev_id
             << " cur_selected=" << selected_machine;
+        if (remember_selection && !dev_id.empty())
+            m_auto_restore_attempted = true;
         auto my_machine_list = get_my_machine_list();
         auto it = my_machine_list.find(dev_id);
 
@@ -659,7 +662,8 @@ namespace Slic3r
         }
 
         selected_machine = dev_id;
-        record_user_last_machine(selected_machine);
+        if (remember_selection)
+            record_user_last_machine(selected_machine);
         return true;
     }
 
@@ -809,7 +813,7 @@ namespace Slic3r
     void DeviceManager::parse_user_print_info(std::string body)
     {
         BOOST_LOG_TRIVIAL(trace) << "DeviceManager::parse_user_print_info";
-        std::lock_guard<std::mutex> lock(listMutex);
+        std::unique_lock<std::mutex> lock(listMutex);
 
         if (device_subseries.size() <= 0) {
             device_subseries = DevPrinterConfigUtil::get_all_subseries();
@@ -916,6 +920,8 @@ namespace Slic3r
         {
             BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << " exception=" << e.what();
         }
+        lock.unlock();
+        load_last_machine();
     }
 
     void DeviceManager::update_user_machine_list_info(const std::string& provider)
@@ -957,15 +963,25 @@ namespace Slic3r
 
     void DeviceManager::load_last_machine()
     {
-        // Only reconnect the remembered cloud machine. Do not select an arbitrary
-        // first machine: agent swaps intentionally leave the selection empty until
-        // the new agent explicitly selects its configured printer.
-        if (userMachineList.empty())
+        // Restore only the exact device saved in this instance's data directory.
+        // Discovery and cloud login are asynchronous, so callers may retry until
+        // that device is available; a failed connection must not loop forever.
+        if (m_auto_restore_attempted || !selected_machine.empty() || !m_agent)
             return;
 
-        const auto& last_monitor_machine = get_user_last_machine();
-        if (userMachineList.find(last_monitor_machine) != userMachineList.end())
-            set_selected_machine(last_monitor_machine);
+        AppConfig* config = Slic3r::GUI::wxGetApp().app_config;
+        const std::string preferred_id = config ? config->get("user_last_selected_machine") : std::string();
+        const std::string agent_id = get_current_printer_agent_id();
+        if (preferred_id.empty() || agent_id.empty())
+            return;
+
+        const auto available = get_my_machine_list(agent_id);
+        if (available.find(preferred_id) == available.end())
+            return;
+
+        m_auto_restore_attempted = true;
+        BOOST_LOG_TRIVIAL(info) << "Restoring preferred printer " << preferred_id;
+        set_selected_machine(preferred_id, false);
     }
 
     void DeviceManager::OnMachineBindStateChanged(MachineObject* obj, const std::string& new_state)
@@ -1030,7 +1046,7 @@ namespace Slic3r
         // check valid machine
         if (obj && m_manager->get_my_machine(obj->get_dev_id()) == nullptr)
         {
-            m_manager->set_selected_machine("");
+            m_manager->set_selected_machine("", false);
             agent->set_user_selected_machine("");
             return;
         }

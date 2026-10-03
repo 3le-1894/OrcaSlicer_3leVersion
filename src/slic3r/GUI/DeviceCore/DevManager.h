@@ -31,6 +31,7 @@ private:
     std::mutex listMutex;
     std::string selected_machine;                               /* dev_id */
     std::string local_selected_machine;                         /* dev_id */
+    bool m_auto_restore_attempted{false};
     std::map<std::string, MachineObject*> localMachineList;     /* dev_id -> MachineObject*, localMachine SSDP   */
     std::map<std::string, MachineObject*> userMachineList;      /* dev_id -> MachineObject*  cloudMachine of User */
 
@@ -46,7 +47,9 @@ public:
     void stop_refresher();
 
     MachineObject* get_selected_machine();
-    bool set_selected_machine(std::string dev_id);
+    // Internal disconnects must not erase the user's preferred device.
+    bool set_selected_machine(std::string dev_id, bool remember_selection = true);
+    void reset_auto_restore() { m_auto_restore_attempted = false; }
 
     // why: clears stale sidebar sync-status / AMS visuals. Public so the printer-agent
     // swap path can reuse it instead of duplicating the two sidebar calls.
