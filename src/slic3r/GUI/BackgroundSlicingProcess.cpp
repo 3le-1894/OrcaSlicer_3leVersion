@@ -714,6 +714,11 @@ Print::ApplyStatus BackgroundSlicingProcess::apply(const Model& model, const Dyn
     // TODO: add partplate config
     DynamicPrintConfig new_config = config;
     new_config.apply(*m_current_plate->config());
+    // Keep the plate's Convenience Mode selection for a later return to X2D,
+    // but use ordinary grouping while a single-nozzle printer is selected.
+    if (new_config.opt_enum<FilamentMapMode>("filament_map_mode") == fmmAutoForMatch &&
+        new_config.option<ConfigOptionFloats>("nozzle_diameter")->size() <= 1)
+        new_config.option<ConfigOptionEnum<FilamentMapMode>>("filament_map_mode")->value = fmmAutoForFlush;
     Print::ApplyStatus invalidated = m_print->apply(model, new_config);
 
     // Orca: prevent resetting under gcode viewer mode

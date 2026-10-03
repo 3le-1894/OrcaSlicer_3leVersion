@@ -134,6 +134,15 @@ bool try_pop_up_before_slice(bool is_slice_all, Plater* plater_ref, PartPlate* p
     applied_maps.resize(filament_colors.size(), 1);
     applied_volume_maps.resize(filament_colors.size(), 0);
 
+    // Match/Convenience Mode needs the selected printer's live filament state.
+    // Do not silently overwrite the plate's choice while the printer connects,
+    // but do not slice with an unavailable mapping either.
+    if (!force_pop_up && applied_mode == fmmAutoForMatch && !plater_ref->get_machine_sync_status()) {
+        wxMessageBox(_L("Convenience Mode requires a synced printer. Connect the selected printer, or choose Filament-Saving Mode before slicing."),
+                     _L("Printer not synced"), wxOK | wxICON_WARNING, plater_ref);
+        return false;
+    }
+
     if (!force_pop_up && applied_mode != fmmManual)
         return true;
 

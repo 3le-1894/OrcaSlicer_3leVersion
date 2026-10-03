@@ -4019,11 +4019,9 @@ void PartPlate::on_extruder_count_changed(int extruder_count)
         std::vector<int> f_map = wxGetApp().plater()->get_global_filament_map();
         std::fill(f_map.begin(), f_map.end(), 1);
         wxGetApp().plater()->set_global_filament_map(f_map);
-        // clear filament map and mode in single extruder mode
+        // A single extruder does not use a filament map. Keep the selected
+        // mode, though, so switching back to a dual-nozzle printer restores it.
         clear_filament_map();
-        //clear_filament_map_mode();
-        // do not clear mode now, reset to default mode
-        m_config.option<ConfigOptionEnum<FilamentMapMode>>("filament_map_mode", true)->value = FilamentMapMode::fmmAutoForFlush;
     }
 }
 

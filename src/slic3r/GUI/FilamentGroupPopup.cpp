@@ -251,15 +251,9 @@ void FilamentGroupPopup::Init()
     }
 
     m_mode = GetFilamentMapMode();
-    if (m_mode == fmmAutoForMatch && !m_connected) {
-        SetFilamentMapMode(fmmAutoForFlush);
-        m_mode = fmmAutoForFlush;
-    }
-    else if (m_slice_all) {
-        // reset the filament map mode in slice all mode
-        SetFilamentMapMode(m_mode);
-    }
-
+    // A printer may still be connecting when this popup is first opened.
+    // Keep the plate's saved/default choice so Convenience Mode is restored
+    // when the printer sync becomes available instead of silently replacing it.
     UpdateSmartFilamentSection();
     UpdateButtonStatus();
     GUI::wxGetApp().UpdateDarkUIWin(this);
@@ -269,13 +263,15 @@ void FilamentGroupPopup::tryPopup(Plater* plater,PartPlate* partplate,bool slice
 {
     if (should_pop_up()) {
         bool connect_status = plater->get_machine_sync_status();
+        const bool context_changed = partplate_ref != partplate || m_slice_all != slice_all;
         this->partplate_ref = partplate;
         this->plater_ref = plater;
         this->m_sync_plate = true;
         this->m_slice_all = slice_all;
         if (m_active) {
-            if (m_connected != connect_status) { Init(); }
+            const bool connection_changed = m_connected != connect_status;
             m_connected = connect_status;
+            if (connection_changed || context_changed) { Init(); }
             ResetTimer();
         }
         else {
@@ -389,7 +385,9 @@ void FilamentGroupPopup::UpdateButtonStatus(int hover_idx)
             global_mode_tags[i]->Hide();
 #endif
         if (ButtonType::btForMatch == i && !m_connected) {
-            button_labels[i]->SetFont(Label::Body_14);
+            const bool selected = mode_list.at(i) == m_mode;
+            radio_btns[i]->SetBitmap(selected ? checked_bmp : disabled_bmp);
+            button_labels[i]->SetFont(selected ? Label::Head_14 : Label::Body_14);
             continue;
         }
         // process checked and unchecked status

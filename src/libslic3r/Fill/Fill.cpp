@@ -1292,12 +1292,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->adapt_fill_octree   = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
         f->print_config        = &this->object()->print()->config();
         f->print_object_config = &this->object()->config();
-		if (surface_fill.params.pattern == ipConcentricInternal) {
-            FillConcentricInternal *fill_concentric = dynamic_cast<FillConcentricInternal *>(f.get());
-            assert(fill_concentric != nullptr);
-            fill_concentric->print_config        = &this->object()->print()->config();
-            fill_concentric->print_object_config = &this->object()->config();
-        } else if (surface_fill.params.pattern == ipConcentric) {
+		if (surface_fill.params.pattern == ipConcentric) {
             FillConcentric *fill_concentric = dynamic_cast<FillConcentric *>(f.get());
             assert(fill_concentric != nullptr);
             fill_concentric->print_config = &this->object()->print()->config();
@@ -1332,7 +1327,9 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         params.anchor_length     = surface_fill.params.anchor_length;
 		params.anchor_length_max = surface_fill.params.anchor_length_max;
 		params.resolution        = resolution;
-        params.use_arachne       = surface_fill.params.pattern == ipConcentric || surface_fill.params.pattern == ipConcentricInternal;
+        // Auto-detected narrow solid infill uses classic concentric offsets;
+        // user-selected concentric infill keeps its existing Arachne behavior.
+        params.use_arachne       = surface_fill.params.pattern == ipConcentric;
         params.layer_height      = layerm->layer()->height;
         params.lateral_lattice_angle_1   = surface_fill.params.lateral_lattice_angle_1;
         params.lateral_lattice_angle_2   = surface_fill.params.lateral_lattice_angle_2;

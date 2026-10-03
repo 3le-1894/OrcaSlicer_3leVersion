@@ -66,7 +66,10 @@ Fill* Fill::new_from_type(const InfillPattern type)
     case ipSupportBase:         return new FillSupportBase();  // simply line fill
     case ipLightning:           return new FillLightning::Filler();
     // BBS: for internal solid infill only
-    case ipConcentricInternal:  return new FillConcentricInternal();
+    // The narrow-solid variant uses the regular concentric offset path. Its
+    // Arachne-specific path can produce an incomplete half-edge graph for
+    // narrow features and crash while generating transition ribs.
+    case ipConcentricInternal:  return new FillConcentric();
     // BBS: for bottom and top surface only
     // Orca: Replace BBS implementation with Prusa implementation
     case ipMonotonicLine:       return new FillMonotonicLines();
