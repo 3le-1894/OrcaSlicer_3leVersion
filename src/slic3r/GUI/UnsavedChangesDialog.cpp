@@ -1791,13 +1791,18 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
             if (variant_index >= 0) {
                 if (printer_options_with_variant_2.count(opt_key.substr(0, opt_key.find_last_of('#'))) > 0)
                     variant_index /= 2;
-                if (boost::nowide::narrow(category).find("Extruder ") == 0)
-                    category = category.substr(0, 8);
-                if (extruder_id)
-                    category = category + (wxString(" {") + (extruder_id->values[variant_index] == 1 ? _L("Left: ") : _L("Right: "))
-                            + L(extruder_variant->values[variant_index]) + "}");
-                else
-                    category = category + (wxString(" {") + L(extruder_variant->values[variant_index]) + "}");
+                const size_t index = static_cast<size_t>(variant_index);
+                // A saved preset may have fewer extruders than the edited preset.
+                // Keep the original category if its variant metadata is missing.
+                if (extruder_variant && index < extruder_variant->values.size()) {
+                    if (boost::nowide::narrow(category).find("Extruder ") == 0)
+                        category = category.substr(0, 8);
+                    if (extruder_id && index < extruder_id->values.size())
+                        category = category + (wxString(" {") + (extruder_id->values[index] == 1 ? _L("Left: ") : _L("Right: "))
+                                + L(extruder_variant->values[index]) + "}");
+                    else
+                        category = category + (wxString(" {") + L(extruder_variant->values[index]) + "}");
+                }
             }
 
             /*m_tree->Append(opt_key, type, option.category_local, option.group_local, option.label_local,

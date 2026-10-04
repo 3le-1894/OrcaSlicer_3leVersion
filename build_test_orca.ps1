@@ -1,6 +1,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Target = "OrcaSlicer",
+    [switch]$Launch,
     [switch]$NoLaunch,
     [switch]$NoClose,
     [switch]$Force
@@ -85,7 +86,7 @@ if (Test-Path $dllPath) {
     Write-Host "DLL timestamp after:  $afterTimestamp"
 }
 
-if (-not $NoLaunch) {
+if ($Launch -and -not $NoLaunch) {
     if (-not (Test-Path $testExe)) {
         throw "Test OrcaSlicer executable was not found: $testExe"
     }
