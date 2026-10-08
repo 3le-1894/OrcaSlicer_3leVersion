@@ -8285,6 +8285,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     if (input_files.empty())
         return std::vector<size_t>();
 
+    const PartPlate* current_plate = partplate_list.get_curr_plate();
+    const bool keep_convenience_mode = current_plate &&
+        current_plate->get_real_filament_map_mode(wxGetApp().preset_bundle->project_config) == fmmAutoForMatch;
+    bool imported_project_config = false;
+
     if (!input_files.empty())
        q->m_3mf_path = input_files[0].string();
     
@@ -8826,6 +8831,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                                 file_wipe_tower_y = *wipe_tower_y_opt;
 
                             preset_bundle->load_config_model(filename.string(), std::move(config), file_version);
+                            imported_project_config = imported_project_config || type_3mf;
 
                             ConfigOption* bed_type_opt = preset_bundle->project_config.option("curr_bed_type");
                             if (bed_type_opt != nullptr) {
@@ -9493,6 +9499,23 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             if (msg.ShowModal() == wxID_YES) {}
         }
     }
+    if (imported_project_config && !q->m_exported_file &&
+        (keep_convenience_mode || wxGetApp().preset_bundle->printers.get_selected_preset().config.opt_string("printer_model") == "Bambu Lab X2D")) {
+        // A downloaded project's automatic grouping must not replace the local
+        // Convenience Mode choice. Preserve explicit custom nozzle assignments.
+        const FilamentMapMode imported_global_mode = q->get_global_filament_map_mode();
+        for (PartPlate* plate : partplate_list.get_plate_list()) {
+            const FilamentMapMode plate_mode = plate->get_filament_map_mode();
+            const FilamentMapMode effective_mode = plate_mode == fmmDefault ? imported_global_mode : plate_mode;
+            if (effective_mode == fmmAutoForFlush) {
+                plate->set_filament_map_mode(fmmAutoForMatch);
+                plate->update_slice_result_valid_state(false);
+            }
+        }
+        if (imported_global_mode == fmmAutoForFlush)
+            q->set_global_filament_map_mode(fmmAutoForMatch);
+    }
+
     q->schedule_background_process(true);
     q->mark_plate_toolbar_image_dirty();
     return obj_idxs;
