@@ -15929,6 +15929,26 @@ void Plater::_calib_pa_select_added_objects() {
 static indexed_triangle_set bridge_calib_make_box(double x, double y, double z, double width, double depth, double height);
 static std::array<bool, 7> scarf_calib_digit_segments(char digit);
 
+// Shared shell setup for the 3 mm Ellis and contour-compensation disks.
+static int configure_ellis_disk_print_settings(DynamicPrintConfig& print_config)
+{
+    const auto *layer_height_opt = print_config.option<ConfigOptionFloat>("layer_height");
+    const auto *first_layer_height_opt = print_config.option<ConfigOptionFloat>("initial_layer_print_height");
+    const double layer_height = layer_height_opt ? std::max(layer_height_opt->value, 0.01) : 0.2;
+    const double first_layer_height = first_layer_height_opt ? std::max(first_layer_height_opt->value, 0.01) : layer_height;
+    const int total_layers = std::max(1, 1 + int(std::ceil((3.0 - first_layer_height) / layer_height)));
+    // Two bottom layers, two sparse-infill layers, and one shell transition layer.
+    const int top_layers = std::max(1, total_layers - 2 - 3);
+    print_config.set_key_value("top_shell_layers", new ConfigOptionInt(top_layers));
+    print_config.set_key_value("top_shell_thickness", new ConfigOptionFloat(0));
+    print_config.set_key_value("bottom_shell_layers", new ConfigOptionInt(2));
+    print_config.set_key_value("bottom_shell_thickness", new ConfigOptionFloat(0));
+    print_config.set_key_value("sparse_infill_density", new ConfigOptionPercent(30));
+    print_config.set_key_value("top_surface_line_width", new ConfigOptionFloatOrPercent(100, true));
+    print_config.set_key_value("slow_down_layer_time", new ConfigOptionFloats({0.0}));
+    return top_layers;
+}
+
 // ORCA: Add pattern parameter
 void adjust_settings_for_flowrate_calib(ModelObjectPtrs& objects, bool linear, int pass, InfillPattern pattern)
 {
@@ -16118,23 +16138,7 @@ void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern, dou
         const double first_ratio = ellis_start;
         const double ratio_step  = std::abs(ellis_step);
         const auto print_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
-        const auto *layer_height_opt = print_config->option<ConfigOptionFloat>("layer_height");
-        const auto *first_layer_height_opt = print_config->option<ConfigOptionFloat>("initial_layer_print_height");
-        const double layer_height = layer_height_opt ? std::max(layer_height_opt->value, 0.01) : 0.2;
-        const double first_layer_height = first_layer_height_opt ? std::max(first_layer_height_opt->value, 0.01) : layer_height;
-        const int total_layers = std::max(1, 1 + int(std::ceil((3.0 - first_layer_height) / layer_height)));
-        // Leave two complete layers for sparse infill between the two bottom
-        // layers and the top shell. The slicer reserves one additional shell
-        // transition layer, so subtract three here to produce two visible
-        // sparse-infill layers in the sliced disk.
-        const int top_layers = std::max(1, total_layers - 2 - 3);
-        print_config->set_key_value("top_shell_layers", new ConfigOptionInt(top_layers));
-        print_config->set_key_value("top_shell_thickness", new ConfigOptionFloat(0));
-        print_config->set_key_value("bottom_shell_layers", new ConfigOptionInt(2));
-        print_config->set_key_value("bottom_shell_thickness", new ConfigOptionFloat(0));
-        print_config->set_key_value("sparse_infill_density", new ConfigOptionPercent(30));
-        print_config->set_key_value("top_surface_line_width", new ConfigOptionFloatOrPercent(100, true));
-        print_config->set_key_value("slow_down_layer_time", new ConfigOptionFloats({0.0}));
+        const int top_layers = configure_ellis_disk_print_settings(*print_config);
 
         auto first_plate = get_partplate_list().get_plate(0);
         if (!first_plate)
@@ -16187,6 +16191,39 @@ void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern, dou
     changed_objects(object_idx);
 }
 
+
+void Plater::calib_contour_compensation()
+{
+    if (new_project(false, false, _L("Contour Compensation")) == wxID_CANCEL)
+        return;
+
+    wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
+    auto& print_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    configure_ellis_disk_print_settings(print_config);
+
+    auto& plates = get_partplate_list();
+    PartPlate* plate = plates.get_plate(0);
+    if (!plate) {
+        plates.create_plate();
+        plate = plates.get_plate(0);
+    }
+    if (!plate)
+        return;
+
+    // A plain, finely faceted cylinder keeps the measuring rim and 3 mm height
+    // free of raised labels. Keep the selected contour compensation for tuning.
+    ModelObject* obj = model().add_object("Contour Compensation 50 mm", "", make_cylinder(25.0, 3.0, PI / 180.0));
+    obj->config.set_key_value("print_flow_ratio", new ConfigOptionFloat(1.0));
+    obj->add_instance()->set_offset(plate->get_center_origin());
+    obj->ensure_on_bed();
+    const size_t obj_idx = model().objects.size() - 1;
+    plates.add_to_plate(obj_idx, 0, 0);
+    sidebar().obj_list()->add_object_to_list(obj_idx);
+    changed_objects({obj_idx});
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    arrange();
+}
 
 void Plater::calib_temp(const Calib_Params& params) {
     constexpr double base_temp_tower_nozzle_diameter = 0.4;

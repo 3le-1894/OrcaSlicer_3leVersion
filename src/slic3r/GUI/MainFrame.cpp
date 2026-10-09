@@ -3583,6 +3583,13 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
+    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Contour Compensation"), _L("Contour Compensation"),
+        [this](wxCommandEvent&) {
+            if (m_plater)
+                CallAfter([this]() { m_plater->calib_contour_compensation(); });
+        }, "", nullptr,
+        [this]() { return m_plater && m_plater->is_view3D_shown(); }, this);
+
     m_topbar->GetCalibMenu()->AppendSeparator();
 
     // Retraction
@@ -3835,6 +3842,13 @@ void MainFrame::init_menubar_as_editor()
             CallAfter([this, start, end, step]() { m_plater->calib_flowrate(false, 0, ipArchimedeanChords, start, end, step); });
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
+
+    append_menu_item(calib_menu, wxID_ANY, _L("Contour Compensation"), _L("Contour Compensation"),
+        [this](wxCommandEvent&) {
+            if (m_plater)
+                CallAfter([this]() { m_plater->calib_contour_compensation(); });
+        }, "", nullptr,
+        [this]() { return m_plater && m_plater->is_view3D_shown(); }, this);
 
     calib_menu->AppendSeparator();
 
