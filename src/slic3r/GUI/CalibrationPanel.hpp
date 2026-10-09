@@ -121,6 +121,7 @@ protected:
     Tabbook*                m_tabpanel{ nullptr };
     SelectMObjectPopup      m_mobjectlist_popup;
     CalibrationWizard*      m_cali_panels[CALI_MODE_COUNT];
+    wxWindow*               m_contour_panel{ nullptr };
     wxTimer*                m_refresh_timer = nullptr;
 };
 }} // namespace Slic3r::GUI

@@ -6,6 +6,14 @@
 #include "I18N.hpp"
 #include "SelectMachine.hpp"
 #include "SelectMachinePop.hpp"
+#include "Plater.hpp"
+#include "Tab.hpp"
+#include "Widgets/Label.hpp"
+#include <wx/scrolwin.h>
+#include <wx/stattext.h>
+#include <wx/textctrl.h>
+#include <wx/button.h>
+#include <cmath>
 
 #include "DeviceCore/DevManager.h"
 
@@ -18,6 +26,141 @@ namespace Slic3r { namespace GUI {
 #define MACHINE_LIST_REFRESH_INTERVAL 2000
 wxDEFINE_EVENT(EVT_FINISHED_UPDATE_MLIST, wxCommandEvent);
 wxDEFINE_EVENT(EVT_UPDATE_USER_MLIST, wxCommandEvent);
+
+// Local dimensional calibration does not require a connected printer or a
+// device wizard. Keep it outside the device-dependent wizard array.
+class ContourCompensationPanel : public wxScrolledWindow
+{
+public:
+    explicit ContourCompensationPanel(wxWindow* parent) : wxScrolledWindow(parent, wxID_ANY)
+    {
+        SetScrollRate(0, FromDIP(10));
+        auto* content = new wxBoxSizer(wxVERTICAL);
+        auto* title = new wxStaticText(this, wxID_ANY, _L("Contour Compensation Calibration"));
+        title->SetFont(Label::Head_14);
+        content->Add(title, 0, wxBOTTOM, FromDIP(20));
+        m_instructions = new wxStaticText(this, wxID_ANY,
+            _L("1. Generate the 50 mm diameter, 3 mm tall cylinder. The Ellis Extrusion Multiplier shell and infill settings apply only to this object. Your process settings, filament flow and cooling remain unchanged.\n\n"
+               "2. Slice and print it, then let it cool completely. Take three diameter measurements at different angles above the first-layer edge, avoiding the seam.\n\n"
+               "3. Enter all three measurements and the X-Y contour compensation used for that print. Calculate and apply the value to your current process settings, then print again to verify. Save your process preset when satisfied."));
+        m_instructions->Wrap(FromDIP(720));
+        content->Add(m_instructions, 0, wxBOTTOM, FromDIP(20));
+
+        auto* generate = new wxButton(this, wxID_ANY, _L("Generate test cylinder"));
+        content->Add(generate, 0, wxBOTTOM, FromDIP(24));
+        auto* grid = new wxFlexGridSizer(2, FromDIP(12), FromDIP(16));
+        grid->AddGrowableCol(1);
+        auto add_field = [&](const wxString& label, const wxString& value) {
+            grid->Add(new wxStaticText(this, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL);
+            auto* field = new wxTextCtrl(this, wxID_ANY, value);
+            grid->Add(field, 1, wxEXPAND);
+            return field;
+        };
+        m_test_compensation = add_field(_L("Compensation used for test (mm)"), "0.0000");
+        m_diameter_1 = add_field(_L("Diameter measurement 1 (mm)"), wxEmptyString);
+        m_diameter_2 = add_field(_L("Diameter measurement 2 (mm)"), wxEmptyString);
+        m_diameter_3 = add_field(_L("Diameter measurement 3 (mm)"), wxEmptyString);
+        content->Add(grid, 0, wxEXPAND | wxBOTTOM, FromDIP(16));
+        auto* calculate = new wxButton(this, wxID_ANY, _L("Calculate and apply compensation"));
+        content->Add(calculate, 0, wxBOTTOM, FromDIP(16));
+        m_result = new wxStaticText(this, wxID_ANY, _L("Enter your measurements to calculate the adjustment."));
+        content->Add(m_result, 0, wxBOTTOM, FromDIP(16));
+        auto* explanation = new wxStaticText(this, wxID_ANY,
+            _L("New compensation = test compensation + (50 - average measured diameter) / 2.\n"
+               "The average uses all three measurements. Positive values enlarge the contour; negative values shrink it. A large difference between measurements needs investigation because this setting applies the same correction in every direction."));
+        explanation->Wrap(FromDIP(720));
+        content->Add(explanation, 0);
+        auto* layout = new wxBoxSizer(wxHORIZONTAL);
+        layout->AddStretchSpacer();
+        layout->Add(content, 0, wxALL, FromDIP(28));
+        layout->AddStretchSpacer();
+        SetSizerAndFit(layout);
+        rescale();
+        wxGetApp().UpdateDarkUI(this);
+
+        if (wxGetApp().preset_bundle) {
+            const auto* offset = wxGetApp().preset_bundle->prints.get_edited_preset().config.option<ConfigOptionFloat>("xy_contour_compensation");
+            if (offset)
+                m_test_compensation->ChangeValue(wxString::Format("%.4f", offset->value));
+        }
+        generate->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+            CallAfter([this]() {
+                if (auto* plater = wxGetApp().plater()) {
+                    plater->calib_contour_compensation();
+                    const auto* offset = wxGetApp().preset_bundle->prints.get_edited_preset().config.option<ConfigOptionFloat>("xy_contour_compensation");
+                    if (offset)
+                        m_test_compensation->ChangeValue(wxString::Format("%.4f", offset->value));
+                    m_diameter_1->Clear();
+                    m_diameter_2->Clear();
+                    m_diameter_3->Clear();
+                }
+            });
+        });
+        calculate->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+            double d1 = 0.0, d2 = 0.0, d3 = 0.0, offset = 0.0;
+            if (!m_diameter_1->GetValue().ToDouble(&d1) || !m_diameter_2->GetValue().ToDouble(&d2) ||
+                !m_diameter_3->GetValue().ToDouble(&d3) ||
+                !m_test_compensation->GetValue().ToDouble(&offset) ||
+                !std::isfinite(d1) || !std::isfinite(d2) || !std::isfinite(d3) || !std::isfinite(offset) ||
+                d1 <= 0.0 || d2 <= 0.0 || d3 <= 0.0) {
+                m_result->SetLabel(_L("Enter three positive, finite diameter measurements and a valid test compensation."));
+            } else {
+                const double average = d1 / 3.0 + d2 / 3.0 + d3 / 3.0;
+                // Retain the compensation used for this print as the baseline:
+                // applying the same measurements again must not compound it.
+                const double suggested = offset + (50.0 - average) * 0.5;
+                auto* print_tab = wxGetApp().get_tab(Preset::TYPE_PRINT);
+                auto* plater = wxGetApp().plater();
+                if (std::isfinite(suggested) && print_tab && plater && wxGetApp().preset_bundle) {
+                    DynamicPrintConfig updated = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+                    updated.set_key_value("xy_contour_compensation", new ConfigOptionFloat(suggested));
+                    print_tab->load_config(updated);
+                    plater->on_config_change(wxGetApp().preset_bundle->full_config());
+                    m_result->SetLabel(wxString::Format(_L("Average diameter: %s mm\nApplied X-Y contour compensation: %s mm\nSave your process preset to keep this value."),
+                        wxString::Format("%.4f", average), wxString::Format("%.4f", suggested)));
+                } else {
+                    m_result->SetLabel(_L("Unable to apply compensation. Check the measurements and active process preset."));
+                }
+            }
+            m_result->Wrap(FromDIP(720));
+            Layout();
+            FitInside();
+        });
+        auto clear_result = [this](wxCommandEvent& event) {
+            m_result->SetLabel(_L("Enter your measurements to calculate the adjustment."));
+            Layout();
+            FitInside();
+            event.Skip();
+        };
+        m_diameter_1->Bind(wxEVT_TEXT, clear_result);
+        m_diameter_2->Bind(wxEVT_TEXT, clear_result);
+        m_diameter_3->Bind(wxEVT_TEXT, clear_result);
+        m_test_compensation->Bind(wxEVT_TEXT, clear_result);
+        Bind(wxEVT_SHOW, [this](wxShowEvent& event) {
+            if (event.IsShown() && m_diameter_1->IsEmpty() && m_diameter_2->IsEmpty() && m_diameter_3->IsEmpty() && wxGetApp().preset_bundle) {
+                const auto* offset = wxGetApp().preset_bundle->prints.get_edited_preset().config.option<ConfigOptionFloat>("xy_contour_compensation");
+                if (offset)
+                    m_test_compensation->ChangeValue(wxString::Format("%.4f", offset->value));
+            }
+            event.Skip();
+        });
+    }
+
+    void rescale()
+    {
+        m_instructions->Wrap(FromDIP(720));
+        Layout();
+        FitInside();
+    }
+
+private:
+    wxStaticText* m_instructions{ nullptr };
+    wxStaticText* m_result{ nullptr };
+    wxTextCtrl* m_test_compensation{ nullptr };
+    wxTextCtrl* m_diameter_1{ nullptr };
+    wxTextCtrl* m_diameter_2{ nullptr };
+    wxTextCtrl* m_diameter_3{ nullptr };
+};
 
 wxString get_calibration_type_name(CalibMode cali_mode)
 {
@@ -509,6 +652,9 @@ void CalibrationPanel::init_tabpanel() {
             selected);
     }
 
+    m_contour_panel = new ContourCompensationPanel(m_tabpanel);
+    m_tabpanel->AddPage(m_contour_panel, _L("Contour Compensation"), false);
+
     // ORCA use standard paddings and keep arrow icon for consistent look between sidebars
     //for (int i = 0; i < (int)CALI_MODE_COUNT; i++)
     //    m_tabpanel->SetPageImage(i, "");
@@ -705,12 +851,18 @@ void CalibrationPanel::msw_rescale()
     for (int i = 0; i < (int)CALI_MODE_COUNT; i++) {
         m_cali_panels[i]->msw_rescale();
     }
+    if (m_contour_panel)
+        static_cast<ContourCompensationPanel*>(m_contour_panel)->rescale();
 }
 
 void CalibrationPanel::on_sys_color_changed()
 {
     for (int i = 0; i < (int)CALI_MODE_COUNT; i++) {
         m_cali_panels[i]->on_sys_color_changed();
+    }
+    if (m_contour_panel) {
+        wxGetApp().UpdateDarkUI(m_contour_panel);
+        m_contour_panel->Refresh();
     }
 }
 

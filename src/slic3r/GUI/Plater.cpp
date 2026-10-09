@@ -16198,8 +16198,10 @@ void Plater::calib_contour_compensation()
         return;
 
     wxGetApp().mainframe->select_tab(TAB_ID_PREPARE);
-    auto& print_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
-    configure_ellis_disk_print_settings(print_config);
+    const auto& print_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    DynamicPrintConfig disk_config;
+    disk_config.apply_only(print_config, {"layer_height", "initial_layer_print_height"});
+    configure_ellis_disk_print_settings(disk_config);
 
     auto& plates = get_partplate_list();
     PartPlate* plate = plates.get_plate(0);
@@ -16213,6 +16215,9 @@ void Plater::calib_contour_compensation()
     // A plain, finely faceted cylinder keeps the measuring rim and 3 mm height
     // free of raised labels. Keep the selected contour compensation for tuning.
     ModelObject* obj = model().add_object("Contour Compensation 50 mm", "", make_cylinder(25.0, 3.0, PI / 180.0));
+    // Limit calibration overrides to this object; the process preset stays intact.
+    obj->config.apply_only(disk_config, {"top_shell_layers", "top_shell_thickness", "bottom_shell_layers",
+                                       "bottom_shell_thickness", "sparse_infill_density", "top_surface_line_width"});
     obj->config.set_key_value("print_flow_ratio", new ConfigOptionFloat(1.0));
     obj->add_instance()->set_offset(plate->get_center_origin());
     obj->ensure_on_bed();
@@ -16220,8 +16225,6 @@ void Plater::calib_contour_compensation()
     plates.add_to_plate(obj_idx, 0, 0);
     sidebar().obj_list()->add_object_to_list(obj_idx);
     changed_objects({obj_idx});
-    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
-    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
     arrange();
 }
 
