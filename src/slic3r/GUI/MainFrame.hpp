@@ -218,6 +218,7 @@ class MainFrame : public DPIFrame
 protected:
     virtual void on_dpi_changed(const wxRect &suggested_rect) override;
     virtual void on_sys_color_changed() override;
+    void show_auto_ers_dialog();
 
 #ifdef __WXMSW__
     WXLRESULT MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam) override;

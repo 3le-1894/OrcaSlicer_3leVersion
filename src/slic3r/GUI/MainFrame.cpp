@@ -3573,6 +3573,10 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
+    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Auto ERS"), _L("Calculate extrusion rate smoothing"),
+        [this](wxCommandEvent&) { show_auto_ers_dialog(); }, "", nullptr,
+        [this]() { return m_plater && m_plater->is_view3D_shown(); }, this);
+
     m_topbar->GetCalibMenu()->AppendSeparator();
 
     // Retraction
@@ -3824,6 +3828,10 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
+    append_menu_item(calib_menu, wxID_ANY, _L("Auto ERS"), _L("Calculate extrusion rate smoothing"),
+        [this](wxCommandEvent&) { show_auto_ers_dialog(); }, "", nullptr,
+        [this]() { return m_plater && m_plater->is_view3D_shown(); }, this);
+
     calib_menu->AppendSeparator();
 
     // Retraction
@@ -4000,6 +4008,68 @@ void MainFrame::set_max_recent_count(int max)
         wxGetApp().app_config->set_recent_projects(recent_projects);
         wxGetApp().app_config->save();
         m_webview->SendRecentList(-1);
+    }
+}
+
+void MainFrame::show_auto_ers_dialog()
+{
+    if (!m_plater || !wxGetApp().preset_bundle)
+        return;
+    const DynamicPrintConfig config = wxGetApp().preset_bundle->full_config();
+    // Use the main nozzle. ERS is a single process setting, not a per-nozzle value.
+    auto main_value = [&](const char* key) {
+        const auto* values = dynamic_cast<const ConfigOptionVector<double>*>(config.option(key));
+        return values && !values->empty() && !values->is_nil(0) ? values->get_at(0) : 0.0;
+    };
+    const double nozzle = main_value("nozzle_diameter");
+    double acceleration = main_value("outer_wall_acceleration");
+    if (acceleration == 0.0)
+        acceleration = main_value("default_acceleration");
+    const auto* width_opt = config.option<ConfigOptionFloatOrPercent>("outer_wall_line_width");
+    if (width_opt && width_opt->value == 0.0)
+        width_opt = config.option<ConfigOptionFloatOrPercent>("line_width");
+    const double width = width_opt ? width_opt->get_abs_value(nozzle) : 0.0;
+    const auto* height_opt = config.option<ConfigOptionFloat>("layer_height");
+    const double height = height_opt ? height_opt->value : 0.0;
+    const double maximum = acceleration * width * height;
+    const double recommended = maximum * 0.70;
+    if (!std::isfinite(recommended) || acceleration <= 0.0 || width <= 0.0 || height <= 0.0 || nozzle <= 0.0) {
+        wxMessageBox(_L("Auto ERS requires a positive outer wall acceleration, explicit line width and layer height. Check the active process and printer settings."),
+                     _L("Auto ERS"), wxOK | wxICON_WARNING, this);
+        return;
+    }
+
+    wxDialog dlg(this, wxID_ANY, _L("Auto ERS"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE);
+    auto* sizer = new wxBoxSizer(wxVERTICAL);
+    auto* grid = new wxFlexGridSizer(2, FromDIP(8), FromDIP(16));
+    auto add_value = [&](const wxString& label, double value, const wxString& unit) {
+        grid->Add(new wxStaticText(&dlg, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL);
+        grid->Add(new wxStaticText(&dlg, wxID_ANY, wxString::Format("%.4f", value) + " " + unit), 0, wxALIGN_CENTER_VERTICAL);
+    };
+    add_value(_L("Main nozzle diameter"), nozzle, "mm");
+    add_value(_L("Outer wall acceleration"), acceleration, wxString::FromUTF8(u8"mm/s²"));
+    add_value(_L("Outer wall line width"), width, "mm");
+    add_value(_L("Layer height"), height, "mm");
+    add_value(_L("Maximum ERS"), maximum, wxString::FromUTF8(u8"mm³/s²"));
+    add_value(_L("Recommended ERS (70%)"), recommended, wxString::FromUTF8(u8"mm³/s²"));
+    sizer->Add(grid, 0, wxALL | wxEXPAND, FromDIP(12));
+    auto* note = new wxStaticText(&dlg, wxID_ANY,
+        _L("Calculated from the active global process and main nozzle. Apply changes only Extrusion rate smoothing. Save your process preset to keep the value."));
+    note->Wrap(FromDIP(440));
+    sizer->Add(note, 0, wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(12));
+    sizer->Add(dlg.CreateStdDialogButtonSizer(wxOK | wxCANCEL), 0, wxALL | wxALIGN_RIGHT, FromDIP(8));
+    if (auto* apply = dlg.FindWindow(wxID_OK))
+        apply->SetLabel(_L("Apply"));
+    dlg.SetSizerAndFit(sizer);
+    wxGetApp().UpdateDlgDarkUI(&dlg);
+    if (dlg.ShowModal() != wxID_OK)
+        return;
+
+    if (auto* print_tab = wxGetApp().get_tab(Preset::TYPE_PRINT)) {
+        DynamicPrintConfig updated = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        updated.set_key_value("max_volumetric_extrusion_rate_slope", new ConfigOptionFloat(recommended));
+        print_tab->load_config(updated);
+        m_plater->on_config_change(wxGetApp().preset_bundle->full_config());
     }
 }
 
