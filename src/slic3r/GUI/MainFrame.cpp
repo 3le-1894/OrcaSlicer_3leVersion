@@ -3539,16 +3539,6 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
-    // Flow rate (Wizard Dialog)
-    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Flow ratio"), _L("Flow Rate Calibration"),
-        [this](wxCommandEvent&) {
-            if (!m_plater) return;
-            if (!m_flow_rate_calib_dlg)
-                m_flow_rate_calib_dlg = new FlowRateCalibrationDialog((wxWindow*)this, wxID_ANY, m_plater);
-            m_flow_rate_calib_dlg->ShowModal();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-
     append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Ellis Extrusion Multiplier"), _L("Ellis Extrusion Multiplier"),
         [this](wxCommandEvent&) {
             if (!m_plater)
@@ -3582,13 +3572,6 @@ void MainFrame::init_menubar_as_editor()
             CallAfter([this, start, end, step]() { m_plater->calib_flowrate(false, 0, ipArchimedeanChords, start, end, step); });
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
-
-    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Contour Compensation"), _L("Contour Compensation"),
-        [this](wxCommandEvent&) {
-            if (m_plater)
-                CallAfter([this]() { m_plater->calib_contour_compensation(); });
-        }, "", nullptr,
-        [this]() { return m_plater && m_plater->is_view3D_shown(); }, this);
 
     m_topbar->GetCalibMenu()->AppendSeparator();
 
@@ -3669,6 +3652,15 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
     m_topbar->GetCalibMenu()->AppendSubMenu(bridging_menu, _L("Bridging"));
+
+    m_topbar->GetCalibMenu()->AppendSeparator();
+
+    append_menu_item(m_topbar->GetCalibMenu(), wxID_ANY, _L("Contour Compensation"), _L("Contour Compensation"),
+        [this](wxCommandEvent&) {
+            if (m_plater)
+                CallAfter([this]() { m_plater->calib_contour_compensation(); });
+        }, "", nullptr,
+        [this]() { return m_plater && m_plater->is_view3D_shown(); }, this);
 
     m_topbar->GetCalibMenu()->AppendSeparator();
 
@@ -3799,17 +3791,6 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
 
-    // Flowrate (with submenu)
-    // ORCA: Flow rate (Wizard Dialog)
-    append_menu_item(calib_menu, wxID_ANY, _L("Flow ratio"), _L("Flow Rate Calibration"),
-        [this](wxCommandEvent&) {
-            if (!m_plater) return;
-            if (!m_flow_rate_calib_dlg)
-                m_flow_rate_calib_dlg = new FlowRateCalibrationDialog((wxWindow*)this, wxID_ANY, m_plater);
-            m_flow_rate_calib_dlg->ShowModal();
-        }, "", nullptr,
-        [this]() {return m_plater->is_view3D_shown();; }, this);
-
     append_menu_item(calib_menu, wxID_ANY, _L("Ellis Extrusion Multiplier"), _L("Ellis Extrusion Multiplier"),
         [this](wxCommandEvent&) {
             if (!m_plater)
@@ -3842,13 +3823,6 @@ void MainFrame::init_menubar_as_editor()
             CallAfter([this, start, end, step]() { m_plater->calib_flowrate(false, 0, ipArchimedeanChords, start, end, step); });
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
-
-    append_menu_item(calib_menu, wxID_ANY, _L("Contour Compensation"), _L("Contour Compensation"),
-        [this](wxCommandEvent&) {
-            if (m_plater)
-                CallAfter([this]() { m_plater->calib_contour_compensation(); });
-        }, "", nullptr,
-        [this]() { return m_plater && m_plater->is_view3D_shown(); }, this);
 
     calib_menu->AppendSeparator();
 
@@ -3929,6 +3903,15 @@ void MainFrame::init_menubar_as_editor()
         }, "", nullptr,
         [this]() {return m_plater->is_view3D_shown();; }, this);
     calib_menu->AppendSubMenu(bridging_menu, _L("Bridging"));
+
+    calib_menu->AppendSeparator();
+
+    append_menu_item(calib_menu, wxID_ANY, _L("Contour Compensation"), _L("Contour Compensation"),
+        [this](wxCommandEvent&) {
+            if (m_plater)
+                CallAfter([this]() { m_plater->calib_contour_compensation(); });
+        }, "", nullptr,
+        [this]() { return m_plater && m_plater->is_view3D_shown(); }, this);
 
     calib_menu->AppendSeparator();
 

@@ -15937,15 +15937,15 @@ static int configure_ellis_disk_print_settings(DynamicPrintConfig& print_config)
     const double layer_height = layer_height_opt ? std::max(layer_height_opt->value, 0.01) : 0.2;
     const double first_layer_height = first_layer_height_opt ? std::max(first_layer_height_opt->value, 0.01) : layer_height;
     const int total_layers = std::max(1, 1 + int(std::ceil((3.0 - first_layer_height) / layer_height)));
-    // Two bottom layers, two sparse-infill layers, and one shell transition layer.
-    const int top_layers = std::max(1, total_layers - 2 - 3);
+    // Reserve only two bottom and two sparse-infill layers. The bridge at the
+    // start of the top shell is already included in top_shell_layers.
+    const int top_layers = std::max(1, total_layers - 2 - 2);
     print_config.set_key_value("top_shell_layers", new ConfigOptionInt(top_layers));
     print_config.set_key_value("top_shell_thickness", new ConfigOptionFloat(0));
     print_config.set_key_value("bottom_shell_layers", new ConfigOptionInt(2));
     print_config.set_key_value("bottom_shell_thickness", new ConfigOptionFloat(0));
     print_config.set_key_value("sparse_infill_density", new ConfigOptionPercent(30));
     print_config.set_key_value("top_surface_line_width", new ConfigOptionFloatOrPercent(100, true));
-    print_config.set_key_value("slow_down_layer_time", new ConfigOptionFloats({0.0}));
     return top_layers;
 }
 
@@ -16137,8 +16137,10 @@ void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern, dou
         // Use a single plate of labeled 40 mm x 3 mm disks for flow-ratio calibration.
         const double first_ratio = ellis_start;
         const double ratio_step  = std::abs(ellis_step);
-        const auto print_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
-        const int top_layers = configure_ellis_disk_print_settings(*print_config);
+        const auto& print_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        DynamicPrintConfig disk_config;
+        disk_config.apply_only(print_config, {"layer_height", "initial_layer_print_height"});
+        configure_ellis_disk_print_settings(disk_config);
 
         auto first_plate = get_partplate_list().get_plate(0);
         if (!first_plate)
@@ -16146,30 +16148,36 @@ void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern, dou
         first_plate = get_partplate_list().get_plate(0);
         if (!first_plate)
             return;
-        const Vec3d plate_origin = first_plate->get_origin();
+        const Vec3d plate_center = first_plate->get_center_origin();
         std::vector<size_t> object_idxs;
         for (double flow_ratio = first_ratio; flow_ratio >= ellis_end - 1e-6; flow_ratio -= ratio_step) {
             const std::string name = into_u8(wxString::Format("Flow Ratio %.2f", flow_ratio));
             ModelObject *obj = model().add_object(name.c_str(), "", make_flow_ratio_disk_mesh(flow_ratio));
             obj->name = name;
             obj->config.set_key_value("print_flow_ratio", new ConfigOptionFloat(flow_ratio));
-            obj->config.set_key_value("bottom_shell_layers", new ConfigOptionInt(2));
-            obj->config.set_key_value("bottom_shell_thickness", new ConfigOptionFloat(0));
-            obj->config.set_key_value("top_shell_layers", new ConfigOptionInt(top_layers));
-            obj->config.set_key_value("top_shell_thickness", new ConfigOptionFloat(0));
-            obj->config.set_key_value("sparse_infill_density", new ConfigOptionPercent(30));
-            obj->config.set_key_value("top_surface_line_width", new ConfigOptionFloatOrPercent(100, true));
+            obj->config.apply_only(disk_config, {"top_shell_layers", "top_shell_thickness", "bottom_shell_layers",
+                                               "bottom_shell_thickness", "sparse_infill_density", "top_surface_line_width"});
             if (obj->instances.empty())
                 obj->add_instance();
-            const size_t index = object_idxs.size();
-            obj->instances[0]->set_offset(plate_origin + Vec3d((index % 3) * 46.0 - 46.0, (index / 3) * 46.0 - 23.0, 0.0));
             const size_t obj_idx = model().objects.size() - 1;
             object_idxs.emplace_back(obj_idx);
             get_partplate_list().add_to_plate(obj_idx, 0, 0);
             sidebar().obj_list()->add_object_to_list(obj_idx);
         }
+        // Keep labels facing the front and ratios descending left-to-right,
+        // front-to-back. Auto-arrange would rotate and reorder these disks.
+        const size_t columns = std::min<size_t>(3, object_idxs.size());
+        if (columns > 0) {
+            const size_t rows = (object_idxs.size() + columns - 1) / columns;
+            for (size_t i = 0; i < object_idxs.size(); ++i) {
+                ModelObject* obj = model().objects[object_idxs[i]];
+                obj->instances[0]->set_offset(plate_center + Vec3d(
+                    (double(i % columns) - double(columns - 1) * 0.5) * 46.0,
+                    (double(i / columns) - double(rows - 1) * 0.5) * 46.0, 0.0));
+                obj->ensure_on_bed();
+            }
+        }
         changed_objects(object_idxs);
-        arrange();
         return;
     } else {
         if (pass == 1)
@@ -16327,9 +16335,10 @@ void Plater::calib_max_vol_speed(const Calib_Params& params)
     auto obj = model().objects[0];
     auto& obj_cfg = obj->config;
 
+    constexpr double brim_width = 10.0;
     auto bed_shape = printer_config->option<ConfigOptionPoints>("printable_area")->values;
     BoundingBoxf bed_ext = get_extents(bed_shape);
-    auto scale_obj = (bed_ext.size().x() - 10) / obj->bounding_box_exact().size().x();
+    auto scale_obj = (bed_ext.size().x() - 2.0 * brim_width) / obj->bounding_box_exact().size().x();
     if (scale_obj < 1.0)
         obj->scale(scale_obj, 1, 1);
 
@@ -16358,7 +16367,7 @@ void Plater::calib_max_vol_speed(const Calib_Params& params)
     obj_cfg.set_key_value("outer_wall_line_width", new ConfigOptionFloatOrPercent(line_width, false));
     obj_cfg.set_key_value("layer_height", new ConfigOptionFloat(layer_height));
     obj_cfg.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterAndInner));
-    obj_cfg.set_key_value("brim_width", new ConfigOptionFloat(5.0));
+    obj_cfg.set_key_value("brim_width", new ConfigOptionFloat(brim_width));
     obj_cfg.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
     obj_cfg.set_key_value("precise_z_height", new ConfigOptionBool(false));
     print_config->set_key_value("timelapse_type", new ConfigOptionEnum<TimelapseType>(tlTraditional));

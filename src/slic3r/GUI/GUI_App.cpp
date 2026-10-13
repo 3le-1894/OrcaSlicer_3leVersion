@@ -3304,7 +3304,7 @@ bool GUI_App::on_init_inner()
     // Set cloud plugin directory from previous session so cloud-installed
     // plugins are discovered even before the network agent is ready.
     const std::string preset_folder = app_config->get("preset_folder");
-    if (!preset_folder.empty()) {
+    if (!preset_folder.empty() && !app_config->get_stealth_mode()) {
         plugin_mgr.set_cloud_user(preset_folder);
     }
 
@@ -3328,7 +3328,7 @@ bool GUI_App::on_init_inner()
     if (m_agent)
         plugin_mgr.set_cloud_agent(std::dynamic_pointer_cast<OrcaCloudServiceAgent>(m_agent->get_cloud_agent()));
 
-    if (m_agent && m_agent->is_user_login()) {
+    if (m_agent && m_agent->is_user_login() && !app_config->get_stealth_mode()) {
         enable_user_preset_folder(true);
         plugin_mgr.set_cloud_user(m_agent->get_user_id());
         // If there is a user logged in we do an immediate sync.
@@ -3349,7 +3349,10 @@ bool GUI_App::on_init_inner()
             }
         }
     } else {
-        enable_user_preset_folder(false);
+        // Stealth logout keeps the cached profile folder as an offline data
+        // source. Do not reset it before load_presets() on the next startup.
+        if (!app_config->get_stealth_mode())
+            enable_user_preset_folder(false);
         plugin_mgr.set_cloud_user("");
     }
 
@@ -5025,7 +5028,7 @@ void GUI_App::post_logout_to_webview(const std::string& provider)
     }
 }
 
-void GUI_App::request_user_logout(const std::string& provider/* = ORCA_CLOUD_PROVIDER*/)
+void GUI_App::request_user_logout(const std::string& provider/* = ORCA_CLOUD_PROVIDER*/, bool retain_local_presets)
 {
     if (m_agent && m_agent->is_user_login(provider)) {
         m_agent->user_logout(true, provider);
@@ -5038,19 +5041,23 @@ void GUI_App::request_user_logout(const std::string& provider/* = ORCA_CLOUD_PRO
         }
 
         if (provider == ORCA_CLOUD_PROVIDER) {
-            /* delete old user settings */
-            bool     transfer_preset_changes = false;
-            wxString header = _L("Some presets are modified.") + "\n" +
-                _L("You can keep the modified presets for the new project, discard, or save changes as new presets.");
-            wxGetApp().check_and_keep_current_preset_changes(_L("User logged out"), header, ActionButtons::KEEP | ActionButtons::SAVE, &transfer_preset_changes);
+            if (!retain_local_presets) {
+                /* delete old user settings */
+                bool     transfer_preset_changes = false;
+                wxString header = _L("Some presets are modified.") + "\n" +
+                    _L("You can keep the modified presets for the new project, discard, or save changes as new presets.");
+                wxGetApp().check_and_keep_current_preset_changes(_L("User logged out"), header, ActionButtons::KEEP | ActionButtons::SAVE, &transfer_preset_changes);
 
-            remove_user_presets();
-            enable_user_preset_folder(false);
+                remove_user_presets();
+                enable_user_preset_folder(false);
+            }
             Slic3r::PluginManager::instance().unload_cloud_plugins();
             Slic3r::PluginManager::instance().clear_cloud_plugin_metadata();
             Slic3r::PluginManager::instance().set_cloud_user("");
-            preset_bundle->load_user_presets(DEFAULT_USER_FOLDER_NAME, ForwardCompatibilitySubstitutionRule::Enable);
-            mainframe->update_side_preset_ui();
+            if (!retain_local_presets) {
+                preset_bundle->load_user_presets(DEFAULT_USER_FOLDER_NAME, ForwardCompatibilitySubstitutionRule::Enable);
+                mainframe->update_side_preset_ui();
+            }
 
             // keep this here. refresh_from_catalog is meant to update the dialog UI.
             if (m_plugins_dlg)
@@ -7728,9 +7735,13 @@ void GUI_App::force_push_conflicting_preset(const std::string& setting_id)
 void GUI_App::on_stealth_mode_enter()
 {
     stop_sync_user_preset();
+    // Keep the loaded profiles, edits and selections; only disconnect cloud
+    // services. preset_folder remains local to this instance's data directory.
+    preset_bundle->export_selections(*app_config);
     BOOST_LOG_TRIVIAL(info) << "logout: on_stealth_mode_enter";
-    request_user_logout(ORCA_CLOUD_PROVIDER);
+    request_user_logout(ORCA_CLOUD_PROVIDER, true);
     request_user_logout(BBL_CLOUD_PROVIDER);
+    app_config->save();
     if (mainframe && mainframe->m_webview) {
         mainframe->m_webview->SendCloudProvidersInfo();
     }

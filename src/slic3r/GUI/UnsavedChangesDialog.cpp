@@ -1212,30 +1212,41 @@ bool UnsavedChangesDialog::save(PresetCollection* dependent_presets, bool show_s
     return true;
 }
 
-wxString get_string_from_enum(const std::string& opt_key, const DynamicPrintConfig& config, bool is_infill = false, int idx = -1)
+wxString get_string_from_enum(const std::string& opt_key, const DynamicPrintConfig& config, int idx = -1)
 {
-    const ConfigOptionDef& def = config.def()->options.at(opt_key);
-    const std::vector<std::string>& names = def.enum_labels;//ConfigOptionEnum<T>::get_enum_names();
+    const ConfigOptionDef* def = config.def()->get(opt_key);
+    const ConfigOption* option = config.option(opt_key);
+    if (!def || !option || option->is_nil())
+        return _L("N/A");
+
     int val = 0;
-
-    if (idx >= 0)
-        val = dynamic_cast<const ConfigOptionInts*>(config.option(opt_key))->get_at(idx);
-    else
-        val = config.option(opt_key)->getInt();
-
-    // Each infill doesn't use all list of infill declared in PrintConfig.hpp.
-    // So we should "convert" val to the correct one
-    if (is_infill) {
-        for (auto key_val : *def.enum_keys_map)
-            if (int(key_val.second) == val) {
-                auto it = std::find(def.enum_values.begin(), def.enum_values.end(), key_val.first);
-                if (it == def.enum_values.end())
-                    return "";
-                return from_u8(_utf8(names[it - def.enum_values.begin()]));
-            }
-        return _L("Undefined");
+    if (idx >= 0) {
+        const auto* values = dynamic_cast<const ConfigOptionInts*>(option);
+        if (!values || static_cast<size_t>(idx) >= values->size() || values->is_nil(idx))
+            return _L("N/A");
+        val = values->get_at(idx);
+    } else {
+        val = option->getInt();
     }
-    return from_u8(_utf8(names[val]));
+
+    // Enum values may be sparse or listed in a different order than their labels.
+    // Imported presets may also contain values without a UI label.
+    if (def->enum_keys_map) {
+        for (const auto& key_val : *def->enum_keys_map) {
+            if (key_val.second != val)
+                continue;
+            auto it = std::find(def->enum_values.begin(), def->enum_values.end(), key_val.first);
+            if (it != def->enum_values.end()) {
+                const size_t label_idx = static_cast<size_t>(it - def->enum_values.begin());
+                if (label_idx < def->enum_labels.size())
+                    return from_u8(_utf8(def->enum_labels[label_idx]));
+            }
+            return from_u8(key_val.first);
+        }
+    } else if (val >= 0 && static_cast<size_t>(val) < def->enum_labels.size()) {
+        return from_u8(_utf8(def->enum_labels[val]));
+    }
+    return _L("Undefined");
 }
 
 // BBS
@@ -1387,28 +1398,10 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         return out;
     }
     case coEnum: {
-        return get_string_from_enum(opt_key, config,
-            opt_key == "top_surface_pattern" ||
-            opt_key == "bottom_surface_pattern" ||
-            opt_key == "internal_solid_infill_pattern" ||
-            opt_key == "sparse_infill_pattern" ||
-            opt_key == "ironing_pattern" ||
-            opt_key == "support_ironing_pattern" ||
-            opt_key == "support_pattern" ||
-            opt_key == "support_interface_pattern")
-            ;
+        return get_string_from_enum(opt_key, config);
     }
     case coEnums: {
-        return get_string_from_enum(opt_key, config,
-            opt_key == "top_surface_pattern" ||
-            opt_key == "bottom_surface_pattern" ||
-            opt_key == "internal_solid_infill_pattern" ||
-            opt_key == "sparse_infill_pattern" ||
-            opt_key == "ironing_pattern" ||
-            opt_key == "support_ironing_pattern" ||
-            opt_key == "support_pattern" ||
-            opt_key == "support_interface_pattern"
-            , opt_idx);
+        return get_string_from_enum(opt_key, config, opt_idx);
     }
     case coPoint: {
         Vec2d val = config.opt<ConfigOptionPoint>(opt_key)->value;

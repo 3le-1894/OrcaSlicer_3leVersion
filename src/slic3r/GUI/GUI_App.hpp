@@ -498,7 +498,7 @@ public:
 
     void            request_user_login(int online_login = 0, const std::string& provider = ORCA_CLOUD_PROVIDER);
     void            request_user_handle(int online_login = 0, const std::string& provider = ORCA_CLOUD_PROVIDER);
-    void            request_user_logout(const std::string& provider = ORCA_CLOUD_PROVIDER);
+    void            request_user_logout(const std::string& provider = ORCA_CLOUD_PROVIDER, bool retain_local_presets = false);
     void            post_logout_to_webview(const std::string& provider);
     int             request_user_unbind(std::string dev_id, const std::string& provider = ORCA_CLOUD_PROVIDER);
     std::string     handle_web_request(std::string cmd);

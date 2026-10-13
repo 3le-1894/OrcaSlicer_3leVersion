@@ -243,31 +243,47 @@ static bool delete_filament_preset_by_name(std::string delete_preset_name, std::
 
     // Find an alternate preset to be selected after the current preset is deleted.
     PresetCollection &m_presets = wxGetApp().preset_bundle->filaments;
+    Preset *need_delete_preset = m_presets.find_preset(delete_preset_name);
+    if (!need_delete_preset) {
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << " cannot find preset: " << delete_preset_name;
+        return false;
+    }
+    if (!need_delete_preset->can_overwrite())
+        return false;
+
+    // Do not retain a collection pointer across cloud deletion or local erasure.
+    delete_preset_name = need_delete_preset->name;
+    const std::string setting_id = need_delete_preset->setting_id;
+    const std::string preset_file = need_delete_preset->file;
+    std::string replacement_name = selected_preset_name;
     if (delete_preset_name == selected_preset_name) {
         const std::deque<Preset> &presets     = m_presets.get_presets();
-        size_t                    idx_current = m_presets.get_idx_selected();
+        const size_t idx_current = std::min(m_presets.get_idx_selected(), presets.size());
 
         // Find the visible preset.
         size_t idx_new = idx_current;
-        if (idx_current > presets.size()) idx_current = presets.size();
-        if (idx_current < 0) idx_current = 0;
-        if (idx_new < presets.size())
-            for (; idx_new < presets.size() && (presets[idx_new].name == delete_preset_name || !presets[idx_new].is_visible); ++idx_new)
-                ;
+        for (; idx_new < presets.size() && (presets[idx_new].name == delete_preset_name || !presets[idx_new].is_visible); ++idx_new)
+            ;
+        if (idx_new == presets.size()) {
+            for (size_t i = idx_current; i > 0;) {
+                --i;
+                if (presets[i].name != delete_preset_name && presets[i].is_visible) {
+                    idx_new = i;
+                    break;
+                }
+            }
+        }
         if (idx_new == presets.size())
-            for (idx_new = idx_current - 1; idx_new > 0 && (presets[idx_new].name == delete_preset_name || !presets[idx_new].is_visible); --idx_new)
-                ;
-        selected_preset_name = presets[idx_new].name;
-        BOOST_LOG_TRIVIAL(info) << boost::format("cause by delete current ,choose the next visible, idx %1%, name %2%") % idx_new % selected_preset_name;
+            return false;
+        replacement_name = presets[idx_new].name;
+        BOOST_LOG_TRIVIAL(info) << boost::format("cause by delete current ,choose the next visible, idx %1%, name %2%") % idx_new % replacement_name;
     }
 
     try {
         // BBS delete preset
-        Preset *need_delete_preset = m_presets.find_preset(delete_preset_name);
-        if (!need_delete_preset) BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(" can't find delete preset and name: %1%") % delete_preset_name;
-        if (!need_delete_preset->setting_id.empty()) {
-            BOOST_LOG_TRIVIAL(info) << "delete preset = " << need_delete_preset->name << ", setting_id = " << need_delete_preset->setting_id;
-            wxGetApp().delete_preset_from_cloud(need_delete_preset->setting_id, need_delete_preset->file);
+        if (!setting_id.empty()) {
+            BOOST_LOG_TRIVIAL(info) << "delete preset = " << delete_preset_name << ", setting_id = " << setting_id;
+            wxGetApp().delete_preset_from_cloud(setting_id, preset_file);
         } else {
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(" can't preset setting id is empty and name: %1%") % delete_preset_name;
         }
@@ -275,11 +291,13 @@ static bool delete_filament_preset_by_name(std::string delete_preset_name, std::
             m_presets.discard_current_changes();
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format("delete preset dirty and cancelled");
         }
-        m_presets.delete_preset(need_delete_preset->name);
+        if (!m_presets.delete_preset(delete_preset_name))
+            return false;
+        selected_preset_name = replacement_name;
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " preset has been delete from filaments, and preset name is: " << delete_preset_name;
     } catch (const std::exception &ex) {
         // FIXME add some error reporting!
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format("found exception when delete: %1% and preset name: %%") % ex.what() % delete_preset_name;
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format("found exception when delete: %1% and preset name: %2%") % ex.what() % delete_preset_name;
         return false;
     }
 
@@ -4668,6 +4686,12 @@ void EditFilamentPresetDialog::delete_preset()
         std::string next_selected_preset_name = wxGetApp().preset_bundle->filaments.get_selected_preset().name;
         bool        delete_result             = delete_filament_preset_by_name(need_delete_preset->name, next_selected_preset_name);
         BOOST_LOG_TRIVIAL(info) << __LINE__ << " filament preset name: " << need_delete_preset->name << (delete_result ? " delete successful" : " delete failed");
+        if (!delete_result) {
+            m_selected_printer.clear();
+            m_need_delete_preset_index = -1;
+            update_preset_tree();
+            return;
+        }
 
         wxGetApp().preset_bundle->filaments.select_preset_by_name(next_selected_preset_name, true);
         for (size_t i = 0; i < wxGetApp().preset_bundle->filament_presets.size(); ++i) {
