@@ -61,12 +61,14 @@ struct Calib_Params
     // Resolved layer height for the VFA tower (0 = auto: nozzle_diameter / 2). Each speed block is a
     // fixed number of layers tall, so this also determines the physical block height / tower height.
     double vfa_layer_height = 0.0;
-    // Scale the calibration model to the nozzle diameter and set the layer height accordingly (temp tower / VFA).
+    // Scale the calibration model to the nozzle diameter and set the layer height accordingly.
     // When false the 0.4 mm / 0.2 mm reference model is printed as-is.
     bool nozzle_based_resize = true;
     // Optional physical Z calibration for fan-speed towers with a base and fixed-height sections.
     double fan_speed_base_height = 0.0;
     double fan_speed_section_height = 0.0;
+    // Retraction tower reference geometry uses 1 mm steps above a 0.4 mm offset.
+    double retraction_tower_scale = 1.0;
 
     CalibMode mode;
 };

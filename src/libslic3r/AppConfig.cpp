@@ -396,6 +396,9 @@ void AppConfig::set_defaults()
     }
 
     // Orca
+    if (get("switch_to_device_after_print").empty()) {
+        set_bool("switch_to_device_after_print", false);
+    }
     if (get("stealth_mode").empty()) {
         set_bool("stealth_mode", false);
     }

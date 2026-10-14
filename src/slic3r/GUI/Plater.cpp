@@ -16148,6 +16148,18 @@ void Plater::calib_flowrate(bool is_linear, int pass, InfillPattern pattern, dou
         first_plate = get_partplate_list().get_plate(0);
         if (!first_plate)
             return;
+        // Each labeled disk supplies the test multiplier. Do not multiply it
+        // by a previously calibrated filament ratio or slow it for layer time.
+        DynamicPrintConfig filament_config = wxGetApp().preset_bundle->filaments.get_edited_preset().config;
+        auto* flow_ratios = dynamic_cast<ConfigOptionVector<double>*>(filament_config.option("filament_flow_ratio"));
+        auto* full_speed_below = dynamic_cast<ConfigOptionVector<double>*>(filament_config.option("slow_down_layer_time"));
+        if (flow_ratios)
+            std::fill(flow_ratios->values.begin(), flow_ratios->values.end(), 1.0);
+        if (full_speed_below)
+            std::fill(full_speed_below->values.begin(), full_speed_below->values.end(), 0.0);
+        wxGetApp().get_tab(Preset::TYPE_FILAMENT)->load_config(filament_config);
+        on_config_change(wxGetApp().preset_bundle->full_config());
+
         const Vec3d plate_center = first_plate->get_center_origin();
         std::vector<size_t> object_idxs;
         for (double flow_ratio = first_ratio; flow_ratio >= ellis_end - 1e-6; flow_ratio -= ratio_step) {
@@ -16236,6 +16248,16 @@ void Plater::calib_contour_compensation()
     arrange();
 }
 
+static double calibration_nozzle_diameter(const DynamicPrintConfig& printer_config, int extruder_id)
+{
+    const auto* diameters = printer_config.option<ConfigOptionFloats>("nozzle_diameter");
+    if (!diameters || diameters->values.empty())
+        return 0.4;
+    const size_t index = std::min(static_cast<size_t>(std::max(extruder_id, 0)), diameters->values.size() - 1);
+    const double diameter = diameters->values[index];
+    return std::isfinite(diameter) && diameter > 0.0 ? diameter : 0.4;
+}
+
 void Plater::calib_temp(const Calib_Params& params) {
     constexpr double base_temp_tower_nozzle_diameter = 0.4;
     constexpr double base_temp_tower_block_height = 10.0;
@@ -16251,15 +16273,7 @@ void Plater::calib_temp(const Calib_Params& params) {
     auto printer_config = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
     auto filament_config = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
     auto start_temp = lround(params.start);
-    const ConfigOptionFloats* nozzle_diameter_config = printer_config->option<ConfigOptionFloats>("nozzle_diameter");
-    size_t nozzle_id = static_cast<size_t>(std::max(params.extruder_id, 0));
-    double nozzle_diameter = base_temp_tower_nozzle_diameter;
-    if (nozzle_diameter_config && !nozzle_diameter_config->values.empty()) {
-        nozzle_id = std::min(nozzle_id, nozzle_diameter_config->values.size() - 1);
-        nozzle_diameter = nozzle_diameter_config->values[nozzle_id];
-    }
-    if (nozzle_diameter <= 0.0)
-        nozzle_diameter = base_temp_tower_nozzle_diameter;
+    const double nozzle_diameter = calibration_nozzle_diameter(*printer_config, params.extruder_id);
 
     const double nozzle_scale = nozzle_diameter / base_temp_tower_nozzle_diameter;
     const double block_height = base_temp_tower_block_height;
@@ -16417,15 +16431,9 @@ void Plater::calib_retraction(const Calib_Params& params)
 
     print_config->set_key_value("enable_wrapping_detection", new ConfigOptionBool(false));
 
-    float nozzle_diameter = printer_config->option<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
-    float layer_height;
-    if (nozzle_diameter <= 0.1f) {
-        layer_height = 0.05f;
-    } else if (nozzle_diameter <= 0.2f) {
-        layer_height = 0.1f;
-    } else {
-        layer_height = 0.2f;
-    }
+    const double nozzle_diameter = calibration_nozzle_diameter(*printer_config, params.extruder_id);
+    const double nozzle_scale = params.nozzle_based_resize ? nozzle_diameter / 0.4 : 1.0;
+    const double layer_height = params.nozzle_based_resize ? nozzle_diameter / 2.0 : print_config->opt_float("layer_height");
 
     auto max_lh = printer_config->option<ConfigOptionFloats>("max_layer_height");
     for (size_t i = 0; i < max_lh->values.size(); ++i) {
@@ -16457,7 +16465,19 @@ void Plater::calib_retraction(const Calib_Params& params)
         cut_horizontal(0, 0, height, ModelObjectCutAttribute::KeepLower);
     }
 
-    p->background_process.fff_print()->set_calib_params(params);
+    // Cut in reference-model coordinates, then scale the complete tower.
+    if (std::abs(nozzle_scale - 1.0) > EPSILON)
+        model().objects[0]->scale(nozzle_scale, nozzle_scale, nozzle_scale);
+    model().objects[0]->ensure_on_bed();
+    changed_objects({0});
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINT)->reload_config();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->update_dirty();
+    wxGetApp().get_tab(Preset::TYPE_PRINTER)->reload_config();
+
+    Calib_Params calib_params = params;
+    calib_params.retraction_tower_scale = nozzle_scale;
+    p->background_process.fff_print()->set_calib_params(calib_params);
 }
 
 void Plater::calib_VFA(const Calib_Params& params)
@@ -16558,6 +16578,11 @@ void Plater::calib_fan_speed(const Calib_Params& params)
     auto printer_config  = &wxGetApp().preset_bundle->printers.get_edited_preset().config;
 
     auto obj = model().objects[0];
+    const double nozzle_diameter = calibration_nozzle_diameter(*printer_config, params.extruder_id);
+    const double nozzle_scale = params.nozzle_based_resize ? nozzle_diameter / 0.4 : 1.0;
+    if (std::abs(nozzle_scale - 1.0) > EPSILON)
+        obj->scale(nozzle_scale, nozzle_scale, nozzle_scale);
+
     // Use the object's un-translated mesh bounds here. bounding_box_exact() includes the
     // instance's plate-position offset, but the added base mesh is in object coordinates;
     // mixing those coordinate spaces places the base far from the tower.
@@ -16600,6 +16625,11 @@ void Plater::calib_fan_speed(const Calib_Params& params)
     obj->config.set_key_value("brim_type", new ConfigOptionEnum<BrimType>(btOuterOnly));
     obj->config.set_key_value("brim_width", new ConfigOptionFloat(3.0));
     obj->config.set_key_value("brim_object_gap", new ConfigOptionFloat(0.0));
+
+    if (params.nozzle_based_resize) {
+        obj->config.set_key_value("layer_height", new ConfigOptionFloat(nozzle_diameter / 2.0));
+        print_config->set_key_value("initial_layer_print_height", new ConfigOptionFloat(nozzle_diameter / 2.0));
+    }
 
     changed_objects({ 0 });
     wxGetApp().get_tab(Preset::TYPE_PRINT)->update_dirty();
@@ -20592,11 +20622,13 @@ void Plater::print_job_finished(wxCommandEvent &evt)
     if (!dev) return;
 
     dev->set_selected_machine(evt.GetString().ToStdString());
-    p->main_frame->request_select_tab(TAB_ID_MONITOR);
-    //jump to monitor and select device status panel
-    MonitorPanel* curr_monitor = p->main_frame->m_monitor;
-    if(curr_monitor)
-       curr_monitor->get_tabpanel()->ChangeSelection(MonitorPanel::PrinterTab::PT_STATUS);
+    if (wxGetApp().app_config->get_bool("switch_to_device_after_print")) {
+        p->main_frame->request_select_tab(TAB_ID_MONITOR);
+        // Jump to monitor and select device status panel only when requested.
+        MonitorPanel* curr_monitor = p->main_frame->m_monitor;
+        if (curr_monitor)
+            curr_monitor->get_tabpanel()->ChangeSelection(MonitorPanel::PrinterTab::PT_STATUS);
+    }
 }
 
 void Plater::send_job_finished(wxCommandEvent& evt)

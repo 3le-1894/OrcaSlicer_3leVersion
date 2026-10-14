@@ -1737,6 +1737,11 @@ void PreferencesDialog::create_items()
     //// GENERAL > Features
     g_sizer->Add(create_item_title(_L("Features")), 1, wxEXPAND);
 
+    auto item_switch_to_device = create_item_checkbox(_L("Switch to Device tab after sending a print"),
+        _L("If enabled, open the Device tab after successfully sending a print. If disabled, stay on the current tab."),
+        "switch_to_device_after_print");
+    g_sizer->Add(item_switch_to_device);
+
     auto item_multi_machine    = create_item_checkbox(_L("Multi device management"), _L("With this option enabled, you can send a task to multiple devices at the same time and manage multiple devices."), "enable_multi_machine", _L("(Requires restart)"));
     g_sizer->Add(item_multi_machine);
 

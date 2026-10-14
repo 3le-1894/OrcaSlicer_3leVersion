@@ -606,9 +606,18 @@ namespace Slic3r
 
                     return true;
                 }
-                // same dev_id, lan => disconnect and reconnect
+                // Keep a healthy LAN connection when reselecting the same printer.
+                // The post-send transition to Monitor also selects it; tearing down
+                // networking here can race the plugin's completed file transfer.
                 else
                 {
+                    if (it->second->get_lan_mode_connection_state() && it->second->is_connected()) {
+                        BOOST_LOG_TRIVIAL(info) << "set_selected_machine: same connected lan machine, dev_id =" << dev_id
+                            << ", keeping connection";
+                        if (remember_selection)
+                            record_user_last_machine(dev_id);
+                        return true;
+                    }
                     BOOST_LOG_TRIVIAL(info) << "set_selected_machine: same lan machine, dev_id =" << dev_id
                         << ", disconnect and reconnect";
 
