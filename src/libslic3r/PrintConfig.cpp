@@ -5265,7 +5265,10 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("fan_max_speed", coFloats);
     def->label = L("Fan speed");
-    def->tooltip = L("The part cooling fan speed may be increased when auto cooling is enabled. This is the maximum speed for the part cooling fan.");
+    def->tooltip = L("When Keep fan always on is disabled, this is the Static Fan Speed. The part cooling fan uses this speed regardless of layer time, without using the hidden minimum fan speed.\n\n"
+                     "When Keep fan always on is enabled, this is the maximum normal part cooling fan speed. Fan speed varies between the minimum and maximum according to layer time.\n\n"
+                     "Initial-layer cooling settings and fan ramping still apply. Explicit overhang, bridge, support interface and ironing fan settings can override this value. The auxiliary fan is controlled separately.\n\n"
+                     "Slow printing down for better layer cooling can still reduce print speed in either mode.");
     def->sidetext = "%";
     def->min = 0;
     def->max = 100;
@@ -6404,6 +6407,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("slow_down_layer_time", coFloats);
     def->label = L("Full speed below");
     def->tooltip = L("When the estimated layer time is shorter than this value, the part cooling fan reaches the paired fan speed. "
+                     "In Static Fan Speed mode, this threshold does not change fan speed. "
                      "Print speed is only reduced if \"Slow printing down for better layer cooling\" is enabled.");
     def->sidetext = L_CONTEXT("s", "second");	// seconds, CIS languages need translation
     def->min = 0;

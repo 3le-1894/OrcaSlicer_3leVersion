@@ -781,7 +781,12 @@ std::string CoolingBuffer::apply_layer_cooldown(
             float fan_cooling_layer_time      = float(EXTRUDER_CONFIG(fan_cooling_layer_time));
             //BBS: always enable the fan speed interpolation according to layer time
             //if (EXTRUDER_CONFIG(cooling)) {
-                if (layer_time < slow_down_layer_time) {
+                if (!EXTRUDER_CONFIG(reduce_fan_stop_start_freq)) {
+                    // Static Fan Speed: the hidden minimum must not influence
+                    // cooling. Initial-layer gates/ramping and feature overrides
+                    // are applied separately below.
+                    fan_speed_new = fan_max_speed;
+                } else if (layer_time < slow_down_layer_time) {
                     // Layer time very short. Enable the fan to a full throttle.
                     fan_speed_new = fan_max_speed;
                 } else if (layer_time < fan_cooling_layer_time) {

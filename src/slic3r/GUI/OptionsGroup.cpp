@@ -102,7 +102,7 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
         ((config_group->config_type() == Preset::TYPE_PRINT && is_process_selection_width_category(config_group->config_category())) ||
          (config_group->config_type() == Preset::TYPE_PRINTER && is_printer_selection_width_category(config_group->config_category()))) &&
         is_uniform_width_field(opt)) {
-        adjusted_opt.width = std::max(adjusted_opt.width, uniformSettingsFieldWidth);
+        adjusted_opt.width = uniformSettingsFieldWidth;
     }
 
     const ConfigOptionDef& field_opt = adjusted_opt;

@@ -919,6 +919,8 @@ void TextCtrl::BUILD() {
     temp->SetLabel(_L(m_opt.sidetext));
 	auto text_ctrl = m_opt.multiline ? (wxTextCtrl *)temp : ((TextInput *) temp)->GetTextCtrl();
     text_ctrl->SetValue(text_value);
+    // Pooled controls may have a minimum width left over from another option.
+    temp->SetMinSize(size);
     temp->SetSize(size);
     m_combine_side_text = !m_opt.multiline;
     if (parent_is_custom_ctrl && m_opt.height < 0)
@@ -1294,6 +1296,7 @@ void SpinCtrl::BUILD() {
     static Builder<SpinInput> builder;
 	auto temp = builder.build(m_parent, "", "", wxDefaultPosition, size,
 		wxSP_ARROW_KEYS);
+    temp->SetMinSize(size);
     temp->SetSize(size);
     temp->SetLabel(_L(m_opt.sidetext));
     temp->GetTextCtrl()->SetLabel(text_value);
@@ -1473,7 +1476,9 @@ void Choice::BUILD()
         temp = builder2.build(m_parent, wxID_ANY, wxString(""), wxDefaultPosition, size, 0, nullptr, wxCB_READONLY);
 #endif //__WXOSX__
     }
-    // temp->SetSize(size);
+    // Reapply the requested width even when Builder returns a pooled control.
+    temp->SetMinSize(size);
+    temp->SetSize(size);
     temp->Clear();
     temp->GetDropDown().SetUseContentWidth(true);
     if (parent_is_custom_ctrl && m_opt.height < 0)
@@ -1545,6 +1550,12 @@ void Choice::BUILD()
             propagate_value();
         }, temp->GetId() );
     }
+
+    // Populating choices can update the widget's size hints. Keep the closed
+    // field aligned; the popup can still expand to fit its contents.
+    const wxSize field_size(size.x, temp->GetSize().y);
+    temp->SetMinSize(field_size);
+    temp->SetSize(field_size);
 
 	temp->SetToolTip(get_tooltip_text(temp->GetValue()));
 }
