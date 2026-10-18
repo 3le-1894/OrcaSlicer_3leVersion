@@ -700,6 +700,27 @@ TEST_CASE("Toolchange temperature commands are unchanged when the wipe tower wai
 // filament count under single_extruder_multi_material). calc_max_layer_height() in ToolOrdering
 // indexed it per-nozzle and read past the end. Shortened directly here to isolate that read;
 // the other per-extruder keys stay extruder-length so slicing reaches the code under test.
+TEST_CASE("Grouping write-back preserves unused trailing filament mappings", "[MultiFilament][Regression]")
+{
+    DynamicPrintConfig config = multifilament_config(2, {
+        { "filament_map",        "1,1" },
+        { "filament_volume_map", "0,0" },
+        { "filament_nozzle_map", "0,0" },
+    });
+    Print print;
+    Model model;
+    init_print({cube(5)}, print, model, config);
+
+    // A plan using only filament 1 can return a one-entry map even though the
+    // project still has two filaments. Write-back must not discard filament 2.
+    print.update_filament_maps_to_config({1}, {0}, {0});
+    CHECK(print.get_filament_maps() == std::vector<int>({1, 1}));
+    CHECK(print.get_filament_volume_maps() == std::vector<int>({0, 0}));
+    CHECK(print.get_filament_nozzle_maps() == std::vector<int>({0, 0}));
+    print.update_filament_maps_to_config({1}, {0}, {0});
+    CHECK(print.get_filament_maps().size() == 2);
+}
+
 TEST_CASE("Multi-extruder slice stays in bounds with a short max_layer_height", "[MultiFilament]")
 {
     DynamicPrintConfig config = multifilament_config(2);

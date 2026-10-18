@@ -8917,9 +8917,11 @@ void GUI_App::load_current_presets(bool active_preset_combox/*= false*/, bool ch
 
     auto& edited_printer_preset = preset_bundle->printers.get_edited_preset();
     PrinterTechnology printer_technology = edited_printer_preset.printer_technology();
-    // ORCA: Sync filament count with the printer's nozzle count before loading presets for multi-tool printers.
+    // ORCA: Sync ordinary tool changers with the nozzle count. Variant-aware printers
+    // route filaments independently and may have unloaded nozzles.
     // This ensures filament_presets vector is properly sized when combo boxes are created/updated.
-    if (printer_technology == ptFFF && !edited_printer_preset.config.opt_bool("single_extruder_multi_material")) {
+    if (printer_technology == ptFFF && !edited_printer_preset.config.opt_bool("single_extruder_multi_material") &&
+        !preset_bundle->support_different_extruders()) {
         auto* nozzle_diameter = edited_printer_preset.config.option<ConfigOptionFloats>("nozzle_diameter");
         if (nozzle_diameter) {
             // Mixed-color slots are virtual filaments kept at the tail of the list, so they have no

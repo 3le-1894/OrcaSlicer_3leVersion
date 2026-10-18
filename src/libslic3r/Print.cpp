@@ -3478,6 +3478,23 @@ void Print::finalize_first_layer_convex_hull()
 
 void Print::update_filament_maps_to_config(std::vector<int> f_maps, std::vector<int> f_volume_maps, std::vector<int> f_nozzle_maps)
 {
+    // A grouping result may end at the last used filament. Do not truncate the
+    // project's unused tail: that also shrinks the resolved variant arrays and
+    // makes the next unchanged GUI apply invalidate the completed G-code.
+    if (const auto* diameters = m_ori_full_print_config.option<ConfigOptionFloats>("filament_diameter")) {
+        const size_t count = diameters->size();
+        auto complete_map = [count](std::vector<int>& map, const std::vector<int>& previous, int fallback) {
+            const size_t supplied = map.size();
+            map.resize(count, fallback);
+            for (size_t i = supplied; i < std::min(count, previous.size()); ++i)
+                map[i] = previous[i];
+        };
+        complete_map(f_maps, m_config.filament_map.values, 1);
+        if (!f_volume_maps.empty())
+            complete_map(f_volume_maps, m_config.filament_volume_map.values, nvtStandard);
+        if (!f_nozzle_maps.empty())
+            complete_map(f_nozzle_maps, m_config.filament_nozzle_map.values, 0);
+    }
     if ((m_config.filament_map.values != f_maps) || (m_config.filament_volume_map.values != f_volume_maps) || (m_config.filament_nozzle_map.values != f_nozzle_maps))
     {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": filament maps changed after pre-slicing.");

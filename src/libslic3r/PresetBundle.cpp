@@ -4201,10 +4201,12 @@ void PresetBundle::update_filament_count()
 {
     if (printers.get_edited_preset().printer_technology() != ptFFF)
         return;
-    const size_t num_extruders = static_cast<size_t>(get_printer_extruder_count());
-    if (filament_presets.size() >= num_extruders)
+    // Variant-aware printers route filaments independently of their nozzle count.
+    // An unloaded auxiliary nozzle must not create another project filament.
+    const size_t minimum_filaments = support_different_extruders() ? 1 : static_cast<size_t>(get_printer_extruder_count());
+    if (filament_presets.size() >= minimum_filaments)
         return;
-    filament_presets.resize(num_extruders, filament_presets.empty()
+    filament_presets.resize(minimum_filaments, filament_presets.empty()
         ? filaments.first_visible().name
         : filament_presets.back());
 }
@@ -5698,19 +5700,15 @@ void PresetBundle::update_multi_material_filament_presets(size_t to_delete_filam
     if (printers.get_edited_preset().printer_technology() != ptFFF)
         return;
 
-    // Orca: when the number of existing filament presets is less than the number of extruders, we will append new filament presets with the
-    // same value as the last existing one.
-    //
     // Verify and select the filament presets.
     size_t num_filaments = this->filament_presets.size();
 
-    auto* nozzle_diameter = static_cast<const ConfigOptionFloats*>(printers.get_edited_preset().config.option("nozzle_diameter"));
-    size_t num_extruders  = nozzle_diameter->values.size();
-    if (num_extruders > num_filaments) { // Verify validity of the current filament presets.
-        for (size_t i = 0; i < std::min(this->filament_presets.size(), num_extruders); ++i)
+    const size_t minimum_filaments = support_different_extruders() ? 1 : static_cast<size_t>(get_printer_extruder_count());
+    if (minimum_filaments > num_filaments) { // Verify validity of the current filament presets.
+        for (size_t i = 0; i < std::min(this->filament_presets.size(), minimum_filaments); ++i)
             this->filament_presets[i] = this->filaments.find_preset(this->filament_presets[i], true)->name;
         // Append the rest of filament presets.
-        this->filament_presets.resize(num_extruders, this->filament_presets.empty() ? this->filaments.first_visible().name :
+        this->filament_presets.resize(minimum_filaments, this->filament_presets.empty() ? this->filaments.first_visible().name :
                                                                                       this->filament_presets.back());
         num_filaments = this->filament_presets.size();
     }

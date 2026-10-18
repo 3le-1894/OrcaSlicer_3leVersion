@@ -429,7 +429,8 @@ public:
     int get_printer_extruder_count() const;
     bool support_different_extruders() const;
 
-    // Orca: Ensure filament_presets has at least one slot per nozzle on FFF printers.
+    // Orca: Ensure FFF printers have a usable filament list. Variant-aware printers
+    // need only one filament; ordinary tool changers keep one slot per nozzle.
     // Called from (load|update)_selections before the parallel project_config arrays
     // (filament_colour/colour_type/map) are sized off filament_presets.size(), so a
     // short saved filament list doesn't truncate the loaded colors.

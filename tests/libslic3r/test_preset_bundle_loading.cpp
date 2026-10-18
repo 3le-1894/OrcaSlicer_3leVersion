@@ -890,6 +890,27 @@ TEST_CASE("A saved mix survives a restart on a multi-tool printer", "[Preset][Bu
     }
 }
 
+TEST_CASE("Variant-aware printers keep a single filament without filling unused nozzles", "[PresetBundleLoading][Regression]")
+{
+    PresetBundle bundle;
+    Preset& printer = add_inmemory_preset(bundle.printers, "Dual Nozzle");
+    printer.config.option<ConfigOptionFloats>("nozzle_diameter", true)->values = {0.4, 0.4};
+    printer.config.option<ConfigOptionStrings>("extruder_variant_list", true)->values =
+        {"Direct Drive Standard", "Bowden Standard"};
+    bundle.printers.select_preset_by_name("Dual Nozzle", true);
+    REQUIRE(bundle.support_different_extruders());
+    bundle.set_num_filaments(1u, std::string("#808080"));
+    const auto preset = bundle.filament_presets.front();
+
+    bundle.update_filament_count();
+    bundle.update_multi_material_filament_presets();
+    CHECK(bundle.get_printer_extruder_count() == 2);
+    REQUIRE(bundle.filament_presets.size() == 1);
+    CHECK(bundle.filament_presets.front() == preset);
+    CHECK(bundle.project_config.option<ConfigOptionStrings>("filament_colour")->size() == 1);
+    CHECK(bundle.project_config.option<ConfigOptionFloats>("flush_volumes_matrix")->size() == 2);
+}
+
 // The startup sizing in GUI_App::load_current_presets targets the nozzle count plus the mixes.
 // That is a floor, never a ceiling: set_num_filaments() trims at the raw tail, which is exactly
 // where the mixes live, so applying the target to a longer list deletes them. A list longer than
