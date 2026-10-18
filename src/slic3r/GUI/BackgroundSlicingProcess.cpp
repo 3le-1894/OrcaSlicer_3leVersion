@@ -713,6 +713,11 @@ Print::ApplyStatus BackgroundSlicingProcess::apply(const Model& model, const Dyn
     assert(config.opt_enum<PrinterTechnology>("printer_technology") == m_print->technology());
     // TODO: add partplate config
     DynamicPrintConfig new_config = config;
+    // A restored plate can contain maps for a different filament count, even in
+    // Manual mode. Keep its overrides consistent with the current filaments so
+    // slice-time map write-back does not invalidate the next unchanged apply.
+    if (const auto* filament_diameters = config.option<ConfigOptionFloats>("filament_diameter"))
+        m_current_plate->set_filament_count(static_cast<int>(filament_diameters->size()));
     new_config.apply(*m_current_plate->config());
     // Keep the plate's Convenience Mode selection for a later return to X2D,
     // but use ordinary grouping while a single-nozzle printer is selected.

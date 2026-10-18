@@ -6541,6 +6541,9 @@ int PartPlateList::load_from_3mf_structure(PlateDataPtrs& plate_data_list, int f
 		int index = create_plate(false);
 		m_plate_list[index]->m_locked = plate_data_list[i]->locked;
 		m_plate_list[index]->config()->apply(plate_data_list[i]->config);
+		// Imported plate overrides can restore maps sized for the source project's
+		// filaments. Normalize after loading them, not only before creating plates.
+		m_plate_list[index]->set_filament_count(filament_count);
 		m_plate_list[index]->set_plate_name(plate_data_list[i]->plate_name);
 		if (plate_data_list[i]->plate_index != index)
 		{
