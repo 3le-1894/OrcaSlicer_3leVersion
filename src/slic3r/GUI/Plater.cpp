@@ -76,6 +76,7 @@
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Slicing.hpp"
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -15936,7 +15937,18 @@ static int configure_ellis_disk_print_settings(DynamicPrintConfig& print_config)
     const auto *first_layer_height_opt = print_config.option<ConfigOptionFloat>("initial_layer_print_height");
     const double layer_height = layer_height_opt ? std::max(layer_height_opt->value, 0.01) : 0.2;
     const double first_layer_height = first_layer_height_opt ? std::max(first_layer_height_opt->value, 0.01) : layer_height;
-    const int total_layers = std::max(1, 1 + int(std::ceil((3.0 - first_layer_height) / layer_height)));
+    // Count the 3 mm disk with the same midpoint rule as the slicer. Rounding
+    // up to its top surface overcounts some profiles (0.24 / 0.30, for example)
+    // and consumes one of the two intended sparse layers with the top shell.
+    SlicingParameters slicing_params;
+    slicing_params.first_object_layer_height = first_layer_height;
+    slicing_params.layer_height = layer_height;
+    slicing_params.min_layer_height = layer_height;
+    slicing_params.max_layer_height = layer_height;
+    slicing_params.object_print_z_max = 3.0;
+    slicing_params.object_shrinkage_compensation_z = 1.0;
+    const auto layers = generate_object_layers(slicing_params, {0.0, layer_height, 3.0, layer_height}, false);
+    const int total_layers = std::max(1, int(layers.size() / 2));
     // Reserve only two bottom and two sparse-infill layers. The bridge at the
     // start of the top shell is already included in top_shell_layers.
     const int top_layers = std::max(1, total_layers - 2 - 2);
