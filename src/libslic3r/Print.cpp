@@ -1759,7 +1759,7 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             for (const PrintRegion &region : object->all_regions()) {
                 const auto &bridge_width_opt = region.config().bridge_line_width;
                 for (FlowRole bridge_role : { frPerimeter, frInfill, frSolidInfill, frTopSolidInfill }) {
-                    const double nozzle_diameter = m_config.nozzle_diameter.get_at(region.extruder(bridge_role) - 1);
+                    const double nozzle_diameter = nozzle_diameter_for_filament(m_config, region.extruder(bridge_role), this->is_BBL_printer());
                     const double bridge_width    = bridge_width_opt.get_abs_value(nozzle_diameter);
                     if (bridge_width <= 0.)
                         continue;
@@ -2023,12 +2023,19 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             if (m_default_region_config.precise_outer_wall && m_default_region_config.wall_sequence != WallSequence::InnerOuter)
                 warn(L("The precise wall option will be ignored for outer-inner or inner-outer-inner wall sequences."), "precise_outer_wall");
 
-            // check adaptive pressure advance model
-            for (unsigned int extruder_id : extruders) {
-                if (m_config.adaptive_pressure_advance.get_at(extruder_id) && 
-                    m_config.enable_pressure_advance.get_at(extruder_id)) {
-                    
-                    const std::string pa_model = m_config.adaptive_pressure_advance_model.get_at(extruder_id);
+            // check adaptive pressure advance model of every extruder variant column of the used filaments
+            const std::vector<int> &self_index = m_config.filament_self_index.values;
+            const size_t pa_columns = std::max(m_config.adaptive_pressure_advance_model.size(),
+                                               extruders.empty() ? size_t(0) : size_t(extruders.back()) + 1);
+            for (size_t column = 0; column < pa_columns; ++column) {
+                // filament_self_index maps a column to its filament once the filament arrays hold one column per variant
+                const unsigned int filament_id = self_index.size() == pa_columns ? self_index[column] - 1 : column;
+                if (!std::binary_search(extruders.begin(), extruders.end(), filament_id))
+                    continue;
+                if (m_config.adaptive_pressure_advance.get_at(column) &&
+                    m_config.enable_pressure_advance.get_at(column)) {
+
+                    const std::string pa_model = m_config.adaptive_pressure_advance_model.get_at(column);
                     if (!pa_model.empty()) {
                         std::string validation_error = AdaptivePAProcessor::validate_adaptive_pa_model(pa_model);
                         if (!validation_error.empty()) {
@@ -2130,7 +2137,7 @@ Flow Print::brim_flow() const
         frPerimeter,
         // Flow::new_from_config_width takes care of the percent to value substitution
 		width,
-        (float)m_config.nozzle_diameter.get_at(m_print_regions.front()->config().outer_wall_filament_id-1),
+        (float)nozzle_diameter_for_filament(m_config, m_print_regions.front()->config().outer_wall_filament_id, this->is_BBL_printer()),
 		(float)this->skirt_first_layer_height());
 }
 
@@ -2147,12 +2154,13 @@ Flow Print::skirt_flow() const
        extruders and take the one with, say, the smallest index;
        The same logic should be applied to the code that selects the extruder during G-code
        generation as well. */
-    return Flow::new_from_config_width(frPerimeter,
-                                       // Flow::new_from_config_width takes care of the percent to value substitution
-                                       width,
-                                       (float) m_config.nozzle_diameter.get_at(
-                                           m_objects.empty() ? 0 : m_objects.front()->config().support_filament - 1),
-                                       (float) this->skirt_first_layer_height());
+    return Flow::new_from_config_width(
+        frPerimeter,
+        // Flow::new_from_config_width takes care of the percent to value substitution
+        width,
+        // ORCA: resolve the actual nozzle the support filament is printed with (dual-nozzle printers).
+        (float)nozzle_diameter_for_filament(m_config, m_objects.empty() ? 0 : m_objects.front()->config().support_filament, this->is_BBL_printer()),
+        (float)this->skirt_first_layer_height());
 }
 
 bool Print::has_support_material() const

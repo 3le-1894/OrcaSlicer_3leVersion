@@ -4,6 +4,46 @@
 
 using namespace Slic3r;
 
+TEST_CASE("Pressure advance migration preserves per-filament enable states", "[Config][Regression]")
+{
+    DynamicPrintConfig config;
+    config.option<ConfigOptionInts>("filament_self_index", true)->values = {1, 1, 2};
+    config.option<ConfigOptionBools>("enable_pressure_advance", true)->values = {true, false};
+    config.option<ConfigOptionFloats>("pressure_advance", true)->values = {0.021, 0.043};
+    normalize_filament_values_to_variants(config);
+
+    const auto* enabled = config.option<ConfigOptionBools>("enable_pressure_advance");
+    REQUIRE(enabled->size() == 3);
+    CHECK(enabled->get_at(0));
+    CHECK(enabled->get_at(1));
+    CHECK_FALSE(enabled->get_at(2));
+    const auto& values = config.option<ConfigOptionFloats>("pressure_advance")->values;
+    REQUIRE(values.size() == 3);
+    CHECK_THAT(values[0], Catch::Matchers::WithinAbs(0.021, 1e-9));
+    CHECK_THAT(values[1], Catch::Matchers::WithinAbs(0.021, 1e-9));
+    CHECK_THAT(values[2], Catch::Matchers::WithinAbs(0.043, 1e-9));
+
+    // A saved per-variant setting is already expanded and must not be overwritten.
+    config.option<ConfigOptionFloats>("pressure_advance")->values[1] = 0.037;
+    normalize_filament_values_to_variants(config);
+    CHECK_THAT(config.option<ConfigOptionFloats>("pressure_advance")->get_at(1), Catch::Matchers::WithinAbs(0.037, 1e-9));
+}
+
+// A per-variant filament option read with a single value gives it to every filament variant. A project
+// exported by an older CLI holds a single value for an option no loaded preset defined, such as
+// filament_ironing_flow.
+TEST_CASE("A per-variant filament option read with a single value gives it to every filament variant", "[Config]")
+{
+    // filament 1 defines Standard and High Flow, filament 2 Standard
+    DynamicPrintConfig config;
+    config.option<ConfigOptionInts>("filament_self_index", true)->values = {1, 1, 2};
+    config.load_from_ini_string("pressure_advance = 0.021", ForwardCompatibilitySubstitutionRule::Disable);
+    const auto& values = config.option<ConfigOptionFloats>("pressure_advance")->values;
+    REQUIRE(values.size() == 3);
+    for (double value : values)
+        CHECK_THAT(value, Catch::Matchers::WithinAbs(0.021, 1e-9));
+}
+
 namespace {
 
 // A 2-extruder printer whose second extruder holds both a Standard and a High Flow nozzle

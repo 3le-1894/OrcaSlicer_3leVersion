@@ -2518,8 +2518,9 @@ void GCodeProcessorResult::reset() {
     //BBS: add mutex for protection of gcode result
     lock();
 
-    moves.clear();
-    lines_ends.clear();
+    // A discarded result will not reuse these print-sized buffers.
+    clear_and_shrink(moves);
+    clear_and_shrink(lines_ends);
     printable_area = Pointfs();
     //BBS: add bed exclude area
     bed_exclude_area = Pointfs();

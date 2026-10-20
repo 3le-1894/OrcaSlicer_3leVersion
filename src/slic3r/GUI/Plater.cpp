@@ -291,6 +291,30 @@ static void set_config_values(DynamicPrintConfig *config, const std::string &key
     }
 }
 
+// Orca: a calibration print sets pressure advance explicitly to 0 on each extruder variant that
+// has it disabled, so the value stored in the printer does not skew the result. Variants with
+// pressure advance enabled keep their own value.
+static void zero_pressure_advance_where_disabled(DynamicPrintConfig *filament_config)
+{
+    auto enable_pa   = filament_config->option<ConfigOptionBools>("enable_pressure_advance");
+    auto pa          = filament_config->option<ConfigOptionFloats>("pressure_advance");
+    auto adaptive_pa = filament_config->option<ConfigOptionBools>("adaptive_pressure_advance");
+    if (!enable_pa || !pa || !adaptive_pa || pa->empty() || adaptive_pa->empty())
+        return;
+    // All variant keys share the variant count; widen a short one rather than index past it.
+    if (pa->size() < enable_pa->size())
+        pa->resize(enable_pa->size());
+    if (adaptive_pa->size() < enable_pa->size())
+        adaptive_pa->resize(enable_pa->size());
+    for (size_t variant = 0; variant < enable_pa->size(); ++variant) {
+        if (enable_pa->get_at(variant))
+            continue;
+        enable_pa->values[variant]   = true;
+        pa->values[variant]          = 0.0;
+        adaptive_pa->values[variant] = false;
+    }
+}
+
 bool Plater::has_illegal_filename_characters(const wxString& wxs_name)
 {
     std::string name = into_u8(wxs_name);
@@ -1551,6 +1575,24 @@ bool Sidebar::priv::switch_diameter(bool single)
         auto diameter_left = left_extruder->combo_diameter->GetValue();
         auto diameter_right = right_extruder->combo_diameter->GetValue();
         if (diameter_left != diameter_right) {
+            auto* bundle = wxGetApp().preset_bundle;
+            if (bundle->is_bbl_vendor()) {
+                double left_value = 0.0, right_value = 0.0;
+                if (!diameter_left.ToCDouble(&left_value) || !diameter_right.ToCDouble(&right_value) ||
+                    left_value <= 0.0 || right_value <= 0.0)
+                    return false;
+                Tab* printer_tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
+                DynamicPrintConfig new_conf = bundle->printers.get_edited_preset().config;
+                auto* nozzle_diameters = new_conf.option<ConfigOptionFloats>("nozzle_diameter");
+                if (!printer_tab || !nozzle_diameters || nozzle_diameters->size() != 2)
+                    return false;
+                // Config order follows the sidebar groups (left/main on X2D),
+                // not the device's physical extruder IDs.
+                nozzle_diameters->values[0] = left_value;
+                nozzle_diameters->values[1] = right_value;
+                printer_tab->load_config(new_conf);
+                return true;
+            }
             std::string printer_type = wxGetApp().preset_bundle->printers.get_edited_preset().get_printer_type(wxGetApp().preset_bundle);
             auto left_name  = _L(DevPrinterConfigUtil::get_toolhead_display_name(printer_type, DEPUTY_EXTRUDER_ID, ToolHeadComponent::Nozzle, ToolHeadNameCase::SentenceCase));
             auto right_name = _L(DevPrinterConfigUtil::get_toolhead_display_name(printer_type, MAIN_EXTRUDER_ID, ToolHeadComponent::Nozzle, ToolHeadNameCase::SentenceCase));
@@ -1580,7 +1622,10 @@ bool Sidebar::priv::switch_diameter(bool single)
     if (nozzle_diameter && nozzle_diameter->size() > 0) {
         auto current_nozzle_dia = get_diameter_string(nozzle_diameter->values[0]);
         // If the selected diameter is the same as current nozzle, don't switch profiles
-        if (current_nozzle_dia == diameter.ToStdString()) {
+        const bool all_nozzles_match = std::all_of(nozzle_diameter->values.begin(), nozzle_diameter->values.end(),
+            [&diameter](double value) { return get_diameter_string(value) == diameter.ToStdString(); });
+        if (current_nozzle_dia == diameter.ToStdString() &&
+            (!wxGetApp().preset_bundle->is_bbl_vendor() || all_nozzles_match)) {
             return true;
         }
     }
@@ -17604,11 +17649,7 @@ void Plater::calib_input_shaping_freq(const Calib_Params& params)
         set_config_values<double, ConfigOptionFloatsNullable>(print_config, "default_jerk", 0);
     }
 
-    if (!filament_config->option<ConfigOptionBools>("enable_pressure_advance")->get_at(0)) {
-        set_config_values<bool, ConfigOptionBools>(filament_config, "enable_pressure_advance", true);
-        set_config_values<double, ConfigOptionFloatsNullable>(filament_config, "pressure_advance", 0.0);
-        set_config_values<bool, ConfigOptionBools>(filament_config, "adaptive_pressure_advance", false);
-    }
+    zero_pressure_advance_where_disabled(filament_config);
 
     printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
     printer_config->set_key_value("input_shaping_emit", new ConfigOptionBool{false});
@@ -17670,11 +17711,7 @@ void Plater::calib_input_shaping_damp(const Calib_Params& params)
         set_config_values<double, ConfigOptionFloatsNullable>(print_config, "default_jerk", 0);
     }
 
-    if (!filament_config->option<ConfigOptionBools>("enable_pressure_advance")->get_at(0)) {
-        set_config_values<bool, ConfigOptionBools>(filament_config, "enable_pressure_advance", true);
-        set_config_values<double, ConfigOptionFloatsNullable>(filament_config, "pressure_advance", 0.0);
-        set_config_values<bool, ConfigOptionBools>(filament_config, "adaptive_pressure_advance", false);
-    }
+    zero_pressure_advance_where_disabled(filament_config);
 
     printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
     printer_config->set_key_value("input_shaping_emit", new ConfigOptionBool{false});
@@ -17736,11 +17773,7 @@ void Plater::Calib_Cornering(const Calib_Params& params)
         set_config_values<double, ConfigOptionFloatsNullable>(print_config, "default_jerk", 0);
     }
 
-    if (!filament_config->option<ConfigOptionBools>("enable_pressure_advance")->get_at(0)) {
-        set_config_values<bool, ConfigOptionBools>(filament_config, "enable_pressure_advance", true);
-        set_config_values<double, ConfigOptionFloatsNullable>(filament_config, "pressure_advance", 0.0);
-        set_config_values<bool, ConfigOptionBools>(filament_config, "adaptive_pressure_advance", false);
-    }
+    zero_pressure_advance_where_disabled(filament_config);
 
     printer_config->set_key_value("resonance_avoidance", new ConfigOptionBool{false});
     printer_config->set_key_value("input_shaping_emit", new ConfigOptionBool{true});
@@ -20201,76 +20234,6 @@ void Plater::reslice()
     p->preview->reload_print();
 
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": finished, started slicing for plate %1%") % p->partplate_list.get_curr_plate_index();
-
-    record_slice_preset("slicing");
-}
-
-void Plater::record_slice_preset(std::string action)
-{
-    // record slice preset
-    try
-    {
-        json j;
-        auto printer_preset = wxGetApp().preset_bundle->printers.get_edited_preset_with_vendor_profile().preset;
-        if (printer_preset.is_system) {
-            j["printer_preset_name"] = printer_preset.name;
-        }
-        else {
-            j["printer_preset_name"] = printer_preset.config.opt_string("inherits");
-        }
-        const t_config_enum_values* keys_map = print_config_def.get("curr_bed_type")->enum_keys_map;
-        if (keys_map) {
-            for (auto item : *keys_map) {
-                if (item.second == wxGetApp().preset_bundle->project_config.opt_enum<BedType>("curr_bed_type")) {
-                    j["curr_bed_type"] = item.first;
-                    break;
-                }
-            }
-        }
-        auto filament_presets = wxGetApp().preset_bundle->filament_presets;
-        for (int i = 0; i < filament_presets.size(); ++i) {
-            auto filament_preset = wxGetApp().preset_bundle->filaments.find_preset(filament_presets[i]);
-            if (filament_preset->is_system) {
-                j["filament_preset_" + std::to_string(i)] = filament_preset->name;
-            }
-            else {
-                j["filament_preset_" + std::to_string(i)] = filament_preset->config.opt_string("inherits");
-            }
-        }
-
-        Preset& print_preset = wxGetApp().preset_bundle->prints.get_edited_preset();
-        if (print_preset.is_system) {
-            j["process_preset"] = print_preset.name;
-        }
-        else {
-            j["process_preset"] = print_preset.config.opt_string("inherits");
-        }
-        j["support_type"] = ConfigOptionEnum<SupportType>::get_enum_names().at(print_preset.config.opt_enum<SupportType>("support_type"));
-        j["sparse_infill_pattern"] = ConfigOptionEnum<InfillPattern>::get_enum_names().at(print_preset.config.opt_enum<InfillPattern>("sparse_infill_pattern"));
-        j["sparse_infill_density"] = print_preset.config.opt<ConfigOptionPercent>("sparse_infill_density")->value;
-
-        j["brim_type"] = ConfigOptionEnum<BrimType>::get_enum_names().at(print_preset.config.opt_enum<BrimType>("brim_type"));
-        j["user_mode"] = wxGetApp().get_mode_str();
-
-        if (p->background_process.fff_print()) {
-            const DynamicPrintConfig& full_config = p->background_process.fff_print()->full_print_config();
-            json values = json::array();
-            if (full_config.has("different_settings_to_system")) {
-                std::vector<std::string> different_values = full_config.option<ConfigOptionStrings>("different_settings_to_system")->values;
-                for (auto& item : different_values) {
-                    values.push_back(item);
-                }
-            }
-            j["different_settings_to_system"] = values;
-        }
-
-        j["record_event"] = action;
-        NetworkAgent* agent = wxGetApp().getAgent();
-    }
-    catch (...)
-    {
-        return;
-    }
 }
 
 //BBS: add project slicing related logic

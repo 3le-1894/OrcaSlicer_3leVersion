@@ -106,6 +106,15 @@ size_t get_extruder_index(const GCodeConfig& config, unsigned int filament_id)
     return 0;
 }
 
+double nozzle_diameter_for_filament(const PrintConfig& config, int filament_id, bool is_bbl_printer)
+{
+    int extruder = filament_id;
+    if (is_bbl_printer && config.nozzle_diameter.size() > 1 &&
+        filament_id >= 1 && static_cast<size_t>(filament_id - 1) < config.filament_map.size())
+        extruder = config.filament_map.get_at(filament_id - 1);
+    return config.nozzle_diameter.get_at(extruder - 1);
+}
+
 
 // Orca: input shaping values types by flavor
 std::vector<std::string> get_shaper_type_values_for_flavor(GCodeFlavor flavor)
@@ -9391,6 +9400,10 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config)
         }
         config.set_key_value("wiping_volumes_use_custom_matrix", new ConfigOptionBool(custom));
     }
+
+    // Orca: a config saved before a key joined filament_options_with_variant stores it once per filament
+    // rather than once per filament variant, and one exported by an older CLI may store a single value.
+    normalize_filament_values_to_variants(config);
 }
 
 const PrintConfigDef print_config_def;
@@ -9492,6 +9505,13 @@ std::set<std::string> filament_options_with_variant = {
     "filament_ironing_spacing",
     "filament_ironing_inset",
     "filament_ironing_speed",
+    // Orca: pressure advance
+    "enable_pressure_advance",
+    "pressure_advance",
+    "adaptive_pressure_advance",
+    "adaptive_pressure_advance_model",
+    "adaptive_pressure_advance_overhangs",
+    "adaptive_pressure_advance_bridges",
     "activate_air_filtration",
     "activate_air_filtration_during_print",
     "activate_air_filtration_on_completion",
@@ -10690,6 +10710,25 @@ void set_variant_override(ConfigOptionVectorBase &target, const ConfigOptionVect
     if (source.size() == 1 && !source.is_nil(0))
         std::fill(indices.begin(), indices.end(), 0);
     target.set_to_index(&source, indices, stride);
+}
+
+void normalize_filament_values_to_variants(DynamicPrintConfig &config)
+{
+    const auto *self_index = config.option<ConfigOptionInts>("filament_self_index");
+    if (self_index == nullptr || self_index->empty())
+        return;
+    const int filament_count = *std::max_element(self_index->values.begin(), self_index->values.end());
+    if (filament_count <= 0 || size_t(filament_count) >= self_index->size())
+        return;
+    for (const std::string &key : filament_options_with_variant) {
+        auto *opt = dynamic_cast<ConfigOptionVectorBase *>(config.option(key));
+        if (opt == nullptr || (opt->size() != size_t(filament_count) && opt->size() != 1))
+            continue;
+        std::unique_ptr<ConfigOption> per_filament(opt->clone());
+        // set_at() takes the first value for a filament past the end of a single-value vector
+        for (size_t variant = 0; variant < self_index->size(); ++variant)
+            opt->set_at(per_filament.get(), variant, self_index->values[variant] - 1);
+    }
 }
 
 

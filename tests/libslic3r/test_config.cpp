@@ -17,6 +17,40 @@
 
 using namespace Slic3r;
 
+TEST_CASE("Bambu filament assignments resolve the physical nozzle diameter", "[Config][Regression]")
+{
+    PrintConfig config;
+    config.nozzle_diameter.values = {0.4, 0.6};
+    config.filament_map.values = {2, 1, 2};
+
+    CHECK_THAT(nozzle_diameter_for_filament(config, 1, true), Catch::Matchers::WithinAbs(0.6, 1e-8));
+    CHECK_THAT(nozzle_diameter_for_filament(config, 2, true), Catch::Matchers::WithinAbs(0.4, 1e-8));
+    CHECK_THAT(nozzle_diameter_for_filament(config, 3, true), Catch::Matchers::WithinAbs(0.6, 1e-8));
+    // Current/default filament and missing map entries keep the existing fallback.
+    CHECK_THAT(nozzle_diameter_for_filament(config, 0, true), Catch::Matchers::WithinAbs(0.4, 1e-8));
+    CHECK_THAT(nozzle_diameter_for_filament(config, 4, true), Catch::Matchers::WithinAbs(0.4, 1e-8));
+
+    config.filament_map.values = {1, 2, 1};
+    CHECK_THAT(nozzle_diameter_for_filament(config, 1, true), Catch::Matchers::WithinAbs(0.4, 1e-8));
+    CHECK_THAT(nozzle_diameter_for_filament(config, 2, true), Catch::Matchers::WithinAbs(0.6, 1e-8));
+    CHECK_THAT(nozzle_diameter_for_filament(config, 3, true), Catch::Matchers::WithinAbs(0.4, 1e-8));
+}
+
+TEST_CASE("Nozzle diameter routing preserves single-nozzle and ordinary toolchanger behavior", "[Config][Regression]")
+{
+    PrintConfig config;
+    config.nozzle_diameter.values = {0.4, 0.6};
+    config.filament_map.values = {2, 1};
+    CHECK_THAT(nozzle_diameter_for_filament(config, 1, false), Catch::Matchers::WithinAbs(0.4, 1e-8));
+    CHECK_THAT(nozzle_diameter_for_filament(config, 2, false), Catch::Matchers::WithinAbs(0.6, 1e-8));
+
+    config.nozzle_diameter.values = {0.6};
+    CHECK_THAT(nozzle_diameter_for_filament(config, 1, true), Catch::Matchers::WithinAbs(0.6, 1e-8));
+    CHECK_THAT(nozzle_diameter_for_filament(config, 2, true), Catch::Matchers::WithinAbs(0.6, 1e-8));
+    config.filament_map.values.clear();
+    CHECK_THAT(nozzle_diameter_for_filament(config, 1, true), Catch::Matchers::WithinAbs(0.6, 1e-8));
+}
+
 SCENARIO("Generic config validation performs as expected.", "[Config]") {
     GIVEN("A config generated from default options") {
         Slic3r::DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();

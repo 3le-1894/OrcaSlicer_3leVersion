@@ -868,6 +868,11 @@ extern std::set<std::string> empty_options;
 void set_variant_override(ConfigOptionVectorBase &target, const ConfigOptionVectorBase &source,
                           const std::vector<int> &variant_index, int stride = 1);
 
+// Orca: lays every filament_options_with_variant option out one value per filament variant, as
+// filament_self_index maps the variants to filaments. An option holding one value per filament, or a
+// single value, gives every variant of a filament that filament's value; other lengths are left alone.
+void normalize_filament_values_to_variants(DynamicPrintConfig &config);
+
 extern std::set<std::string> filament_dev_options;
 
 extern void update_static_print_config_from_dynamic(ConfigBase& config, const DynamicPrintConfig& dest_config, std::vector<int> variant_index, std::set<std::string>& key_set1, int stride = 1);
@@ -2496,6 +2501,8 @@ static bool has_zero_flush_volume_for_used_filaments(const std::vector<T> &fv_ma
 }
 
 size_t get_extruder_index(const GCodeConfig& config, unsigned int filament_id);
+
+double nozzle_diameter_for_filament(const PrintConfig& config, int filament_id, bool is_bbl_printer);
 
 } // namespace Slic3r
 
