@@ -3049,6 +3049,10 @@ bool GUI_App::on_init_inner()
     GUI::wxGetApp().app_config->save();
 #endif // __APPLE__
 
+    // Desktop appearance detection can change the saved mode after the initial
+    // colour setup. Keep cached widget colours in sync before creating the UI.
+    init_label_colours();
+    Update_dark_mode_flag();
 
     bool init_dark_color_mode = dark_mode();
     bool init_sys_menu_enabled = app_config->get("sys_menu_enabled") == "1";
