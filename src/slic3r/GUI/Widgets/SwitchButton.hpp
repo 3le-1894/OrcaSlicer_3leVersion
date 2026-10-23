@@ -161,6 +161,7 @@ public:
         btns[index]->SetTextColor(color);
         btns[index]->Refresh();
     }
+    void SetModified(int index, bool modified);
     void SetButtonCornerRadius(double radius);
     void SetButtonPadding(const wxSize &padding);
 
@@ -174,13 +175,16 @@ protected:
 
 private:
     std::vector<Button *> btns;
+    std::vector<bool> btns_modified;
     wxBoxSizer           *sizer = nullptr;
     int                   sel   = -1;
 
     StateColor m_bg_color;
     StateColor m_text_color;
+    StateColor m_br_color_modified;
+    StateColor m_fg_color_modified;
     double     m_button_radius;
-    wxSize     m_button_padding;
+    wxSize     m_button_padding; // DIP; converted when applied to a button.
 };
 
 #endif // !slic3r_GUI_SwitchButton_hpp_

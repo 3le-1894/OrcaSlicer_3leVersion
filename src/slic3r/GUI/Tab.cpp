@@ -516,6 +516,7 @@ void Tab::create_preset_tab()
 
     if (dynamic_cast<TabPrinter *>(this) || dynamic_cast<TabPrint *>(this)) {
         m_extruder_switch = new MultiSwitchButton(panel);
+        m_extruder_switch->SetFont(Label::Body_11);
         m_extruder_switch->SetMaxSize({em_unit(this) * 40, -1});
         m_extruder_switch->Bind(wxCUSTOMEVT_MULTISWITCH_SELECTION, [this](auto &evt) {
             evt.Skip();
@@ -534,12 +535,17 @@ void Tab::create_preset_tab()
         m_extruder_sync_box = new wxPanel(panel, wxID_ANY);
         m_extruder_sync_box->SetBackgroundColour(panel->GetBackgroundColour());
         m_extruder_sync_box->SetToolTip(_L("Synchronization of different extruder drives or nozzle volume types is not supported."));
-        m_extruder_sync = new ScalableButton(m_extruder_sync_box, wxID_ANY, "extruder_sync");
+        m_extruder_sync = nullptr;
+        add_scaled_button(m_extruder_sync_box, &m_extruder_sync, "extruder_sync");
         m_extruder_sync->SetToolTip(_L("Synchronize the modification of parameters to the corresponding parameters of another extruder."));
         m_extruder_sync->Bind(wxEVT_BUTTON, [this](auto &evt) {
             evt.Skip();
             sync_excluder();
         });
+
+        ScalableButton *icon = nullptr;
+        add_scaled_button(panel, &icon, "multi_extruder");
+        icon->SetToolTip(_L("Parameters with this icon can be configurable per nozzle."));
 
         auto sync_box_sizer = new wxBoxSizer(wxHORIZONTAL);
         sync_box_sizer->Add(m_extruder_sync, 1, wxEXPAND);
@@ -547,16 +553,20 @@ void Tab::create_preset_tab()
 
         m_variant_sizer  = new wxBoxSizer(wxHORIZONTAL);
         auto right_sizer = new wxBoxSizer(wxHORIZONTAL);
+        auto left_sizer = new wxBoxSizer(wxHORIZONTAL);
 
+        m_variant_sizer->Add(left_sizer, 0, wxALIGN_CENTER);
         m_variant_sizer->AddStretchSpacer(1);
         m_variant_sizer->Add(m_extruder_switch, 0, wxALIGN_CENTER, 0);
-        m_variant_sizer->Add(right_sizer, 1, wxALIGN_CENTER);
-        right_sizer->AddStretchSpacer(1);
+        m_variant_sizer->AddStretchSpacer(1);
+        m_variant_sizer->Add(right_sizer, 0, wxALIGN_CENTER);
+        left_sizer->Add(icon, 0, wxALIGN_CENTER | wxLEFT, m_em_unit);
         right_sizer->Add(m_extruder_sync_box, 0, wxALIGN_CENTER | wxRIGHT, m_em_unit);
 
         m_main_sizer->Add(m_variant_sizer, 0, wxEXPAND | wxTOP, m_em_unit);
     } else if (dynamic_cast<TabFilament *>(this)) {
         m_variant_combo = new MultiSwitchButton(panel);
+        m_variant_combo->SetFont(Label::Body_11);
         m_variant_combo->Bind(wxCUSTOMEVT_MULTISWITCH_SELECTION, [this](auto &evt) {
             evt.Skip();
             switch_excluder(evt.GetInt());
@@ -568,13 +578,17 @@ void Tab::create_preset_tab()
             m_page_view->GetParent()->Layout();
         });
 
+        ScalableButton *icon = nullptr;
+        add_scaled_button(panel, &icon, "multi_extruder");
+        icon->SetToolTip(_L("Parameters with this icon can be configurable per nozzle."));
 
-        wxBoxSizer *combo_sizer = new wxBoxSizer(wxHORIZONTAL);
-        combo_sizer->Add(m_variant_combo, 1, wxEXPAND);
         wxBoxSizer *top_sizer = new wxBoxSizer(wxHORIZONTAL);
-        top_sizer->Add(combo_sizer, 1, wxEXPAND | wxLEFT, m_em_unit);
-        m_variant_sizer  = new wxBoxSizer(wxVERTICAL);
-        m_variant_sizer->Add(top_sizer, 0, wxLEFT, m_em_unit);
+        top_sizer->Add(icon,            0, wxALIGN_CENTER_VERTICAL);
+        top_sizer->Add(m_variant_combo, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(2));
+
+        m_variant_sizer = new wxBoxSizer(wxVERTICAL);
+        m_variant_sizer->Add(top_sizer, 0, wxEXPAND | wxLEFT, m_em_unit);
+
         m_main_sizer->Add(m_variant_sizer, 0, wxEXPAND | wxTOP, m_em_unit);
     }
 
@@ -1177,43 +1191,29 @@ void Tab::update_extruder_switch_colors()
     }
 
     auto options = generate_extruder_options();
-    auto extruders = m_preset_bundle->printers.get_edited_preset().config.option<ConfigOptionEnumsGeneric>("extruder_type");
-
-    for (size_t switch_index = 0; switch_index < options.size(); ++switch_index) {
-        int selection = m_extruder_switch ? m_extruder_switch->GetSelection() : (m_variant_combo ? m_variant_combo->GetSelection() : 0);
-        if (switch_index == selection) continue;
-
-        bool sys_extruder = true;
-        bool modified_extruder = false;
-        std::vector<PageShp> pages_to_check;
-
-        if (m_active_page) {
-            if (m_active_page->title() == "Speed" || m_active_page->title() == "Motion ability" || m_active_page->title() == "Filament" ||
-                m_active_page->title() == "Setting Overrides" || m_active_page->title() == "Multimaterial") {
-                for (auto page_ptr : m_pages) {
-                    if (page_ptr.get() == m_active_page) {
-                        pages_to_check.push_back(page_ptr);
-                        break;
-                    }
+    std::vector<PageShp> pages_to_check;
+    if (m_active_page) {
+        const wxString t = m_active_page->title();
+        if (t == "Speed" || t == "Motion ability" || t == "Filament" ||
+            t == "Setting Overrides" || t == "Multimaterial" || t.StartsWith("Extruder ")) {
+            for (auto &p : m_pages) {
+                if (p.get() == m_active_page) {
+                    pages_to_check.push_back(p);
+                    break;
                 }
             }
         }
-        if (pages_to_check.empty()) {
-            continue;
-        }
-        check_extruder_options_status(switch_index, sys_extruder, modified_extruder, pages_to_check);
+    }
 
-        StateColor default_color(std::make_pair(0x6B6B6B, (int) StateColor::NotChecked), std::make_pair(0xFFFFFE, (int) StateColor::Normal));
-        StateColor color = modified_extruder ? StateColor(m_modified_label_clr) : default_color;
+    for (size_t switch_index = 0; switch_index < options.size(); ++switch_index) {
+        bool sys_extruder = true;
+        bool modified_extruder = false;
+        if (!pages_to_check.empty())
+            check_extruder_options_status(static_cast<int>(switch_index), sys_extruder, modified_extruder, pages_to_check);
+        // no matching page: clear the flag so the tag doesn't keep a stale color
 
-        if (m_extruder_switch)
-            m_extruder_switch->SetButtonTextColor(switch_index, color);
-        if (m_variant_combo) {
-            Button *btn = m_variant_combo->GetButton(switch_index);
-            if (btn) {
-                m_variant_combo->SetButtonTextColor(switch_index, color);
-            }
-        }
+        if (m_extruder_switch) m_extruder_switch->SetModified(switch_index, modified_extruder);
+        if (m_variant_combo)   m_variant_combo->SetModified(switch_index, modified_extruder);
     }
 }
 
@@ -1660,8 +1660,6 @@ void Tab::sys_color_changed()
         bmp->msw_rescale();
     if (m_detach_preset_btn)
         m_detach_preset_btn->msw_rescale();
-    if (m_extruder_sync)
-        m_extruder_sync->msw_rescale();
 
     // update icons for tree_ctrl
     for (ScalableBitmap& bmp : m_scaled_icons_list)
@@ -8186,6 +8184,9 @@ void Tab::update_extruder_variants(int extruder_id, bool reload)
         const int selection = m_variant_combo->GetSelection();
         auto      options   = generate_extruder_options();
         m_variant_combo->SetOptions(options);
+        const size_t item_n = options.size();
+        const int h_pad = item_n > 6 ? 6 : (item_n > 4 ? 8 : (item_n > 2 ? 20 : 36));
+        m_variant_combo->SetButtonPadding(wxSize(h_pad, 3));
 
         if (!options.empty())
             m_variant_combo->SetSelection(selection < 0 || selection >= (int) options.size() ? 0 : selection);

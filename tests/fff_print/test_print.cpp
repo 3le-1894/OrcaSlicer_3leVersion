@@ -12,6 +12,7 @@
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Print.hpp"
+#include "libslic3r/Slicing.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/GCodeReader.hpp"
@@ -594,4 +595,82 @@ TEST_CASE("Height ranges and modifiers count for the filament shrinkage compensa
         return w.string.find("Filament shrinkage will not be used") != std::string::npos;
     });
     CHECK(mismatch_warning == ! object_on_filament_2);
+}
+
+TEST_CASE("The build height check counts the Z shrinkage compensation once", "[Print][validate][Regression]")
+{
+    // printable_height is 100 mm and Z shrinks to 95 %, so the object is sliced 100 / 95 times taller.
+    // 92 mm become about 96.8 mm and fit; 97 mm become about 102.1 mm and only the compensation makes them too tall; 101 mm are too tall on their own.
+    const auto [height, expected] = GENERATE(table<double, std::string>({
+        { 92., "" },
+        { 97., "because of material shrinkage compensation" },
+        { 101., "exceeds the maximum build volume height." },
+    }));
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+        { "printable_height", 100. },
+        { "filament_shrinkage_compensation_z", "95%" },
+        { "layer_height", 0.2 },
+        { "initial_layer_print_height", 0.2 },
+        { "layer_change_gcode", "G92 E0\n" }, // validate() relative-E reset
+    });
+
+    Print print;
+    Model model;
+    init_print({ make_cube(20., 20., height) }, print, model, config);
+    const std::string error = print.validate().string;
+    INFO(error);
+    if (expected.empty())
+        CHECK(error.empty());
+    else
+        CHECK(error.find(expected) != std::string::npos);
+}
+
+TEST_CASE("The build height check counts the raft", "[Print][validate][Regression]")
+{
+    // printable_height is 100 mm; three raft layers lift the object by 0.9 mm.
+    const auto [height, fits] = GENERATE(table<double, bool>({ { 98.8, true }, { 99.8, false } }));
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+        { "printable_height", 100. },
+        { "raft_layers", 3 },
+        { "layer_height", 0.2 },
+        { "initial_layer_print_height", 0.2 },
+        { "layer_change_gcode", "G92 E0\n" }, // validate() relative-E reset
+    });
+
+    Print print;
+    Model model;
+    init_print({ make_cube(20., 20., height) }, print, model, config);
+    const SlicingParameters &slicing_params = print.objects().front()->slicing_parameters();
+    REQUIRE_THAT(slicing_params.object_print_z_min, Catch::Matchers::WithinAbs(0.9, EPSILON));
+    const std::string error = print.validate().string;
+    INFO(error);
+    if (fits)
+        CHECK(error.empty());
+    else
+        CHECK(error.find("maximum build volume height") != std::string::npos);
+}
+
+TEST_CASE("The build height check handles a single layer above the print volume", "[Print][validate][Regression]")
+{
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+        { "printable_height", 0.05 },
+        { "filament_shrinkage_compensation_z", "100%" },
+        { "layer_height", 0.2 },
+        { "initial_layer_print_height", 0.2 },
+        { "layer_change_gcode", "G92 E0\n" },
+    });
+
+    Print print;
+    Model model;
+    init_print({ make_cube(20., 20., 0.1) }, print, model, config);
+    const auto &slicing_params = print.objects().front()->slicing_parameters();
+    std::vector<coordf_t> profile;
+    PrintObject::update_layer_height_profile(*model.objects.front(), slicing_params, profile);
+    const auto layers = generate_object_layers(slicing_params, profile, false);
+    // The generator stores each layer as a pair of bottom/top Z coordinates.
+    REQUIRE(layers.size() == 2);
+    CHECK(print.validate().string.find("maximum build volume height") != std::string::npos);
 }
