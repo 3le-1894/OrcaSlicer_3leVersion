@@ -20596,7 +20596,16 @@ void Plater::print_job_finished(wxCommandEvent &evt)
     Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
     if (!dev) return;
 
-    dev->set_selected_machine(evt.GetString().ToStdString());
+    const std::string printed_device_id = evt.GetString().ToStdString();
+    MachineObject* selected = dev->get_selected_machine();
+    // Completing a transfer does not require reconnecting an already-selected
+    // LAN printer. Status flags can lag here, causing set_selected_machine() to
+    // tear down the plugin connection while post-transfer messages are pending.
+    if (!selected || selected->get_dev_id() != printed_device_id || selected->connection_type() != "lan")
+        dev->set_selected_machine(printed_device_id);
+    else
+        BOOST_LOG_TRIVIAL(info) << "print_job_finished: keeping the selected LAN connection after transfer";
+
     if (wxGetApp().app_config->get_bool("switch_to_device_after_print")) {
         p->main_frame->request_select_tab(TAB_ID_MONITOR);
         // Jump to monitor and select device status panel only when requested.
