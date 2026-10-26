@@ -92,7 +92,9 @@ ExtrusionEntityCollection ExtrusionEntityCollection::chained_path_from(const Ext
 	// Clone the extrusion entities.
 	for (auto &ptr : out.entities)
 		ptr = ptr->clone();
-	chain_and_reorder_extrusion_entities(out.entities, &start_near);
+    // This fork keeps the collection hierarchy during G-code export. Refine
+    // paths within each sortable collection as well as the outer collection order.
+    chain_and_reorder_extrusion_entities(out.entities, start_near);
     return out;
 }
 

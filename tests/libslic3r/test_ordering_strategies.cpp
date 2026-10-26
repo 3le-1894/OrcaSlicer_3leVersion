@@ -1,13 +1,17 @@
 #include <catch2/catch_all.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #define SLIC3R_TEST_HARNESS
 
 #include "libslic3r/Point.hpp"
 #include "libslic3r/GCode/OrderingStrategies.hpp"
 #include "libslic3r/Geometry.hpp"
+#include "libslic3r/ShortestPath.hpp"
 
 #include <algorithm>
 #include <unordered_set>
+#include <numeric>
+#include <random>
 
 using namespace Slic3r;
 
@@ -294,4 +298,73 @@ TEST_CASE("snake_core handles three points", "[Snake]") {
     auto p2 = snake_core(pts);
 
     REQUIRE(is_permutation(p2, 3));
+}
+
+// The shortest cycle through the points, trying every order.
+static double shortest_cycle_length(const Points& centers)
+{
+    std::vector<size_t> path(centers.size());
+    std::iota(path.begin(), path.end(), 0);
+    double best = std::numeric_limits<double>::max();
+    do {
+        best = std::min(best, tsp_cycle_path_length(path, centers));
+    } while (std::next_permutation(path.begin() + 1, path.end()));
+    return best;
+}
+
+static Points random_centers(unsigned seed, size_t count)
+{
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<> coordinate(0., 200.);
+    Points centers;
+    for (size_t i = 0; i < count; ++i) {
+        // One draw per statement, as the evaluation order of function arguments is unspecified.
+        const double x = coordinate(rng);
+        const double y = coordinate(rng);
+        centers.emplace_back(Point::new_scale(x, y));
+    }
+    return centers;
+}
+
+TEST_CASE("The exact tour visits every point along the shortest cycle", "[TSPPostProcessing][TravelOptimization][Regression]") {
+    const size_t count = GENERATE(4, 5, 6, 8);
+    for (unsigned seed = 1; seed <= 10; ++seed) {
+        const Points centers = random_centers(seed, count);
+        const std::vector<size_t> path = tsp_exact_cycle(centers);
+        REQUIRE(is_permutation(path, count));
+        CHECK(euclidean_path_length(path, centers) <= shortest_cycle_length(centers) + SCALED_EPSILON);
+    }
+}
+
+TEST_CASE("Default ordering tours up to ten points along the shortest cycle", "[TSPPostProcessing][TravelOptimization][Regression]") {
+    const bool  from_start = GENERATE(false, true);
+    const Point start      = Point::new_scale(-20., -20.);
+    for (unsigned seed = 1; seed <= 5; ++seed) {
+        const Points centers = random_centers(seed, 9);
+        const std::vector<size_t> path = chain_points_with_postprocessing(centers, from_start ? &start : nullptr);
+        REQUIRE(is_permutation(path, centers.size()));
+        CHECK(euclidean_path_length(path, centers) <= shortest_cycle_length(centers) + SCALED_EPSILON);
+    }
+}
+
+TEST_CASE("Default ordering of many points is never longer than the greedy cycle", "[TSPPostProcessing][TravelOptimization][Regression]") {
+    for (unsigned seed = 1; seed <= 10; ++seed) {
+        const Points centers = random_centers(seed, 150);
+        const std::vector<size_t> path = chain_points_with_postprocessing(centers, nullptr);
+        REQUIRE(is_permutation(path, centers.size()));
+        CHECK(euclidean_path_length(path, centers) <= euclidean_path_length(chain_points(centers, nullptr), centers) + SCALED_EPSILON);
+        CHECK_FALSE(has_crossings(path, centers));
+    }
+}
+
+TEST_CASE("Small default tours start at the point nearest the nozzle", "[TSPPostProcessing][TravelOptimization][Regression]")
+{
+    const size_t count = GENERATE(0, 1, 2, 3);
+    const Points candidates {Point::new_scale(100., 0.), Point::new_scale(0., 0.), Point::new_scale(50., 50.)};
+    const Points centers(candidates.begin(), candidates.begin() + count);
+    const Point from = Point::new_scale(-10., 0.);
+    const auto path = chain_points_with_postprocessing(centers, &from);
+    REQUIRE(is_permutation(path, count));
+    if (count > 0)
+        CHECK(path.front() == (count == 1 ? size_t(0) : size_t(1)));
 }

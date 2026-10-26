@@ -992,7 +992,7 @@ TEST_CASE("Smoothed concentric infill stays inside the fill region", "[Fill][Reg
         REQUIRE(point_count(smooth) > point_count(sharp));
 }
 
-TEST_CASE("Smoothing multiline lightning infill keeps its outlines connected", "[Fill][Regression]")
+TEST_CASE("Smoothing multiline lightning infill keeps its outlines connected", "[Fill][TravelOptimization][Regression]")
 {
     // With more than one line per infill wall, the branches are printed as outlines drawn around them,
     // and the outlines of branches that run close to each other merge into one. Rounding the branches
@@ -1021,4 +1021,67 @@ TEST_CASE("Smoothing multiline lightning infill keeps its outlines connected", "
     // The outlines are still rounded.
     REQUIRE(smooth.point_count > sharp.point_count);
     REQUIRE(smooth.sharp_turns < sharp.sharp_turns);
+}
+
+TEST_CASE("Infill lines whose ends are next to each other join into one path", "[Fill][TravelOptimization][Regression]")
+{
+    // An out-and-back pair 1 mm apart, as multiline infill leaves, and a line 19 mm away.
+    Polylines lines { Polyline(Point::new_scale(0., 0.), Point::new_scale(10., 0.)), Polyline(Point::new_scale(0., 1.), Point::new_scale(10., 1.)),
+                      Polyline(Point::new_scale(0., 20.), Point::new_scale(10., 20.)) };
+    join_close_ends(lines, scale_(1.5), true);
+
+    REQUIRE(lines.size() == 2);
+    const auto joined = std::find_if(lines.begin(), lines.end(), [](const Polyline &pl) { return pl.size() == 4; });
+    REQUIRE(joined != lines.end());
+    // Both lines plus the 1 mm between them, joined at one end only, as joining the other end too would close a loop.
+    CHECK_THAT(unscale<double>(joined->length()), Catch::Matchers::WithinAbs(21., 1e-6));
+    CHECK(joined->first_point() != joined->last_point());
+}
+
+TEST_CASE("Joined infill lines print each line once", "[Fill][TravelOptimization][Regression]")
+{
+    // The middle line comes first and both of its ends get joined, so the group has to be walked from an outer line.
+    Polylines lines { Polyline(Point::new_scale(0., 0.), Point::new_scale(10., 0.)), Polyline(Point::new_scale(0., 1.), Point::new_scale(10., 1.)),
+                      Polyline(Point::new_scale(10., -1.), Point::new_scale(0., -1.)) };
+    join_close_ends(lines, scale_(1.5), true);
+
+    REQUIRE(lines.size() == 1);
+    CHECK(lines.front().size() == 6);
+    // Three 10 mm lines and two 1 mm joins.
+    CHECK_THAT(unscale<double>(lines.front().length()), Catch::Matchers::WithinAbs(32., 1e-6));
+}
+
+TEST_CASE("Infill line ends are not joined across another line", "[Fill][TravelOptimization][Regression]")
+{
+    // A pair 1 mm apart whose left ends have a third line running between them, which a join there would cross.
+    Polylines lines { Polyline(Point::new_scale(0., 0.), Point::new_scale(10., 0.)), Polyline(Point::new_scale(0., 1.), Point::new_scale(10., 1.)),
+                      Polyline(Point::new_scale(-5., 0.5), Point::new_scale(5., 0.5)) };
+    join_close_ends(lines, scale_(1.5), true);
+
+    REQUIRE(lines.size() == 2);
+    const auto joined = std::find_if(lines.begin(), lines.end(), [](const Polyline &pl) { return pl.size() == 4; });
+    REQUIRE(joined != lines.end());
+    // Joined on the right, where nothing is in between, so the left ends stay open.
+    CHECK(joined->first_point().x() == 0);
+    CHECK(joined->last_point().x() == 0);
+}
+
+TEST_CASE("Infill lines that cannot reverse join only end to start", "[Fill][TravelOptimization][Regression]")
+{
+    const Point a(Point::new_scale(0., 0.)), b(Point::new_scale(10., 0.)), c(Point::new_scale(10., 1.)), d(Point::new_scale(0., 1.));
+    SECTION("Ends that would need a reversal stay apart") {
+        Polylines lines { Polyline(a, b), Polyline(d, c) };
+        join_close_ends(lines, scale_(1.5), false);
+        CHECK(lines.size() == 2);
+    }
+    SECTION("The end of one line joins the start of the next, both kept in their direction") {
+        Polylines lines { Polyline(c, d), Polyline(a, b) };
+        join_close_ends(lines, scale_(1.5), false);
+        REQUIRE(lines.size() == 1);
+        const Points &points = lines.front().points;
+        REQUIRE(points.size() == 4);
+        auto position = [&points](const Point &p) { return std::find(points.begin(), points.end(), p) - points.begin(); };
+        CHECK(position(a) < position(b));
+        CHECK(position(c) < position(d));
+    }
 }
