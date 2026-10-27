@@ -265,8 +265,11 @@ void OptionsGroup::apply_collapsed_state()
     const bool show_content = !m_collapsed;
     if (m_content_spacer)
         m_content_spacer->Show(show_content);
-    if (custom_ctrl)
+    if (custom_ctrl) {
         custom_ctrl->set_collapsed(m_collapsed);
+        // The custom panel is in the outer sizer, not m_grid_sizer.
+        sizer->Show(custom_ctrl, show_content, false);
+    }
     show_sizer_items_recursive(m_grid_sizer, show_content);
     sizer->Show(m_grid_sizer, show_content, false);
 
