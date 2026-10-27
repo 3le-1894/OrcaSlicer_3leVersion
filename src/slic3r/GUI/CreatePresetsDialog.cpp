@@ -1396,7 +1396,7 @@ wxString CreateFilamentPresetDialog::curr_create_filament_type()
 
 wxString CreateFilamentPresetDialog::filament_type_value() const
 {
-    wxString type_str = m_filament_type_combobox ? m_filament_type_combobox->GetLabel() : wxEmptyString;
+    wxString type_str = m_filament_type_combobox ? m_filament_type_combobox->GetLabel() : wxString();
     if (_L("Select Type") == type_str) {
         return wxEmptyString;
     }
