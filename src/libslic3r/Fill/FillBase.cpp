@@ -142,6 +142,12 @@ ThickPolylines Fill::fill_surface_arachne(const Surface* surface, const FillPara
 // BBS: this method is used to fill the ExtrusionEntityCollection. It call fill_surface by default
 void Fill::fill_surface_extrusion(const Surface* surface, const FillParams& params, ExtrusionEntitiesPtr& out)
 {
+    // Snapshot the base fill inset before a pattern adjusts spacing. Multiline
+    // rectilinear clips at half-spacing without overlap; use that stricter inset
+    // for multiline joins too. New joins may not use overlap to erase a hole or
+    // extend outside the original surface, even if existing anchors do so.
+    const double join_overlap = params.multiline > 1 ? std::min(0., this->overlap) : this->overlap;
+    const float join_offset = float(scale_(std::min(0., join_overlap - 0.5 * this->spacing)));
     Polylines polylines;
     ThickPolylines thick_polylines;
     try {
@@ -190,8 +196,10 @@ void Fill::fill_surface_extrusion(const Surface* surface, const FillParams& para
         }
         else {
             // Orca: sparse infill lines whose ends are next to each other print as one path, without a travel between them.
-            if (params.extrusion_role == erInternalInfill && ! eec->no_sort)
-                join_close_ends(polylines, scale_(2. * this->spacing), params.can_reverse);
+            if (params.extrusion_role == erInternalInfill && ! eec->no_sort && polylines.size() > 1) {
+                const ExPolygons permitted_region = offset_ex(surface->expolygon, join_offset);
+                join_close_ends(polylines, scale_(2. * this->spacing), params.can_reverse, permitted_region);
+            }
             extrusion_entities_append_paths(
                 eec->entities, std::move(polylines),
                 params.extrusion_role,
@@ -2915,11 +2923,15 @@ void multiline_fill(Polylines& polylines, const FillParams& params, float spacin
     polylines = std::move(all_polylines);
 }
 
-void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse)
+void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse, const ExPolygons &permitted_region)
 {
     const size_t n = polylines.size();
-    if (n < 2 || max_gap <= 0.)
+    if (n < 2 || max_gap <= 0. || permitted_region.empty())
         return;
+    const Polygons boundary = to_polygons(permitted_region);
+    Lines boundary_edges;
+    for (const Polygon &polygon : boundary)
+        append(boundary_edges, to_lines(polygon));
     static constexpr size_t npos = size_t(-1);
     // End 2 * i is the first point of polyline i, 2 * i + 1 its last.
     auto end_point = [&polylines](size_t e) -> const Point & { return (e & 1) ? polylines[e >> 1].points.back() : polylines[e >> 1].points.front(); };
@@ -3003,8 +3015,39 @@ void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse)
                             return true;
         return false;
     };
+    auto contained = [&](size_t a, size_t b) {
+        // Clipper may classify an open path on a polygon edge as outside.
+        // Accept those pieces only when boundary edges cover their full length,
+        // using exact collinearity instead of dilating the polygon (and holes).
+        for (const Polyline &outside : diff_pl(Polyline(end_point(a), end_point(b)), boundary))
+            for (const Line &piece : outside.lines()) {
+                if (piece.a == piece.b)
+                    continue;
+                const int axis = std::abs(piece.b.x() - piece.a.x()) >= std::abs(piece.b.y() - piece.a.y()) ? 0 : 1;
+                const coord_t lo = std::min(piece.a[axis], piece.b[axis]), hi = std::max(piece.a[axis], piece.b[axis]);
+                std::vector<std::pair<coord_t, coord_t>> intervals;
+                for (const Line &edge : boundary_edges)
+                    if (int128::orient(piece.a, piece.b, edge.a) == 0 && int128::orient(piece.a, piece.b, edge.b) == 0) {
+                        const coord_t first = std::max(lo, std::min(edge.a[axis], edge.b[axis]));
+                        const coord_t last = std::min(hi, std::max(edge.a[axis], edge.b[axis]));
+                        if (first <= last)
+                            intervals.emplace_back(first, last);
+                    }
+                std::sort(intervals.begin(), intervals.end());
+                coord_t covered = lo;
+                for (const auto &[first, last] : intervals) {
+                    if (first > covered)
+                        break;
+                    covered = std::max(covered, last);
+                }
+                if (covered < hi)
+                    return false;
+            }
+        return true;
+    };
     for (const auto &[apart, trail, d, a, b] : gaps)
-        if (partner[a] == npos && partner[b] == npos && find(a >> 1) != find(b >> 1) && ! crosses(a, b)) {
+        if (partner[a] == npos && partner[b] == npos && find(a >> 1) != find(b >> 1) && ! crosses(a, b) &&
+            contained(a, b)) {
             partner[a] = b;
             partner[b] = a;
             parent[find(a >> 1)] = find(b >> 1);

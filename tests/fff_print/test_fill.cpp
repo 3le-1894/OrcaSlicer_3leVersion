@@ -1023,12 +1023,20 @@ TEST_CASE("Smoothing multiline lightning infill keeps its outlines connected", "
     REQUIRE(smooth.sharp_turns < sharp.sharp_turns);
 }
 
+namespace {
+ExPolygons infill_join_test_region()
+{
+    return {ExPolygon(Points {Point::new_scale(-6., -2.), Point::new_scale(11., -2.),
+                              Point::new_scale(11., 21.), Point::new_scale(-6., 21.)})};
+}
+}
+
 TEST_CASE("Infill lines whose ends are next to each other join into one path", "[Fill][TravelOptimization][Regression]")
 {
     // An out-and-back pair 1 mm apart, as multiline infill leaves, and a line 19 mm away.
     Polylines lines { Polyline(Point::new_scale(0., 0.), Point::new_scale(10., 0.)), Polyline(Point::new_scale(0., 1.), Point::new_scale(10., 1.)),
                       Polyline(Point::new_scale(0., 20.), Point::new_scale(10., 20.)) };
-    join_close_ends(lines, scale_(1.5), true);
+    join_close_ends(lines, scale_(1.5), true, infill_join_test_region());
 
     REQUIRE(lines.size() == 2);
     const auto joined = std::find_if(lines.begin(), lines.end(), [](const Polyline &pl) { return pl.size() == 4; });
@@ -1043,7 +1051,7 @@ TEST_CASE("Joined infill lines print each line once", "[Fill][TravelOptimization
     // The middle line comes first and both of its ends get joined, so the group has to be walked from an outer line.
     Polylines lines { Polyline(Point::new_scale(0., 0.), Point::new_scale(10., 0.)), Polyline(Point::new_scale(0., 1.), Point::new_scale(10., 1.)),
                       Polyline(Point::new_scale(10., -1.), Point::new_scale(0., -1.)) };
-    join_close_ends(lines, scale_(1.5), true);
+    join_close_ends(lines, scale_(1.5), true, infill_join_test_region());
 
     REQUIRE(lines.size() == 1);
     CHECK(lines.front().size() == 6);
@@ -1056,7 +1064,7 @@ TEST_CASE("Infill line ends are not joined across another line", "[Fill][TravelO
     // A pair 1 mm apart whose left ends have a third line running between them, which a join there would cross.
     Polylines lines { Polyline(Point::new_scale(0., 0.), Point::new_scale(10., 0.)), Polyline(Point::new_scale(0., 1.), Point::new_scale(10., 1.)),
                       Polyline(Point::new_scale(-5., 0.5), Point::new_scale(5., 0.5)) };
-    join_close_ends(lines, scale_(1.5), true);
+    join_close_ends(lines, scale_(1.5), true, infill_join_test_region());
 
     REQUIRE(lines.size() == 2);
     const auto joined = std::find_if(lines.begin(), lines.end(), [](const Polyline &pl) { return pl.size() == 4; });
@@ -1071,12 +1079,12 @@ TEST_CASE("Infill lines that cannot reverse join only end to start", "[Fill][Tra
     const Point a(Point::new_scale(0., 0.)), b(Point::new_scale(10., 0.)), c(Point::new_scale(10., 1.)), d(Point::new_scale(0., 1.));
     SECTION("Ends that would need a reversal stay apart") {
         Polylines lines { Polyline(a, b), Polyline(d, c) };
-        join_close_ends(lines, scale_(1.5), false);
+        join_close_ends(lines, scale_(1.5), false, infill_join_test_region());
         CHECK(lines.size() == 2);
     }
     SECTION("The end of one line joins the start of the next, both kept in their direction") {
         Polylines lines { Polyline(c, d), Polyline(a, b) };
-        join_close_ends(lines, scale_(1.5), false);
+        join_close_ends(lines, scale_(1.5), false, infill_join_test_region());
         REQUIRE(lines.size() == 1);
         const Points &points = lines.front().points;
         REQUIRE(points.size() == 4);
@@ -1084,4 +1092,178 @@ TEST_CASE("Infill lines that cannot reverse join only end to start", "[Fill][Tra
         CHECK(position(a) < position(b));
         CHECK(position(c) < position(d));
     }
+}
+
+namespace {
+ExPolygon notched_infill_region(double half_gap = 0.2)
+{
+    return ExPolygon(Points {
+        Point::new_scale(-2., -2.), Point::new_scale(2., -2.), Point::new_scale(2., 2.),
+        Point::new_scale(half_gap, 2.), Point::new_scale(half_gap, -1.), Point::new_scale(-half_gap, -1.),
+        Point::new_scale(-half_gap, 2.), Point::new_scale(-2., 2.) });
+}
+
+Polylines separated_infill_lines(double half_gap = 0.2, double y = 0.)
+{
+    return {Polyline(Point::new_scale(-1.5, y), Point::new_scale(-half_gap, y)),
+            Polyline(Point::new_scale(half_gap, y), Point::new_scale(1.5, y))};
+}
+
+// Exercise the ordinary extrusion entry point with deterministic clipped lines,
+// independently of the infill pattern's choice of phase and direction.
+class PrescribedSparseFill : public Fill
+{
+public:
+    Polylines paths;
+    double spacing_after_generation = 0.;
+    Fill *clone() const override { return new PrescribedSparseFill(*this); }
+    bool is_self_crossing() override { return false; }
+    Polylines fill_surface(const Surface *, const FillParams &) override
+    {
+        if (spacing_after_generation > 0.)
+            spacing = spacing_after_generation;
+        return paths;
+    }
+};
+
+Polylines prescribed_sparse_extrusions(PrescribedSparseFill &fill, const ExPolygon &region, int multiline = 1)
+{
+    Surface surface(stInternal, region);
+    FillParams params;
+    params.extrusion_role = erInternalInfill;
+    params.multiline = multiline;
+    params.flow = Flow(0.4f, 0.2f, 0.4f);
+    params.using_internal_flow = true;
+    ExtrusionEntityCollection output;
+    fill.fill_surface_extrusion(&surface, params, output.entities);
+    Polylines printed;
+    output.collect_polylines(printed);
+    return printed;
+}
+}
+
+TEST_CASE("Sparse infill extrusion does not bridge an excluded notch", "[Fill][InfillContainment][TravelOptimization][Regression]")
+{
+    const double overlap = GENERATE(0.2, 0.6);
+    CAPTURE(overlap);
+    const ExPolygon region = notched_infill_region();
+    PrescribedSparseFill fill;
+    fill.spacing = 0.4;
+    fill.overlap = overlap; // Zero inset, or overlap that would erase the notch if allowed to expand it.
+    fill.paths = separated_infill_lines();
+    const Polylines printed = prescribed_sparse_extrusions(fill, region);
+    CHECK(printed.size() == 2);
+    CHECK(diff_pl(printed, region).empty());
+}
+
+TEST_CASE("Infill joins do not cross holes or disconnected regions", "[Fill][InfillContainment][TravelOptimization][Regression]")
+{
+    const bool disconnected = GENERATE(false, true);
+    // The smaller gap is below SCALED_EPSILON: containment must not dilate the
+    // polygon by that tolerance and thereby fill an otherwise representable hole.
+    const double half_gap = GENERATE(0.2, 0.00001);
+    CAPTURE(disconnected, half_gap);
+    ExPolygons region;
+    if (disconnected) {
+        region = {ExPolygon(Points {Point::new_scale(-2., -2.), Point::new_scale(-half_gap, -2.),
+                                     Point::new_scale(-half_gap, 2.), Point::new_scale(-2., 2.)}),
+                  ExPolygon(Points {Point::new_scale(half_gap, -2.), Point::new_scale(2., -2.),
+                                     Point::new_scale(2., 2.), Point::new_scale(half_gap, 2.)})};
+    } else {
+        ExPolygon polygon(Points {Point::new_scale(-2., -2.), Point::new_scale(2., -2.),
+                                   Point::new_scale(2., 2.), Point::new_scale(-2., 2.)});
+        Polygon hole(Points {Point::new_scale(-half_gap, -0.5), Point::new_scale(half_gap, -0.5),
+                              Point::new_scale(half_gap, 0.5), Point::new_scale(-half_gap, 0.5)});
+        hole.make_clockwise();
+        polygon.holes.push_back(std::move(hole));
+        region.push_back(std::move(polygon));
+    }
+    Polylines lines = separated_infill_lines(half_gap);
+    join_close_ends(lines, scale_(0.8), true, region);
+    CHECK(lines.size() == 2);
+    CHECK(diff_pl(lines, region).empty());
+}
+
+TEST_CASE("Infill joins without a permitted region leave paths unchanged", "[Fill][InfillContainment][TravelOptimization][Regression]")
+{
+    Polylines lines = separated_infill_lines();
+    const Polylines original = lines;
+    SECTION("No region supplied") { join_close_ends(lines, scale_(0.8), true); }
+    SECTION("Explicitly empty region") { join_close_ends(lines, scale_(0.8), true, {}); }
+    REQUIRE(lines.size() == original.size());
+    CHECK(lines[0].points == original[0].points);
+    CHECK(lines[1].points == original[1].points);
+}
+
+TEST_CASE("Infill joins can follow the permitted outer boundary", "[Fill][InfillContainment][TravelOptimization][Regression]")
+{
+    const ExPolygons region {ExPolygon(Points {Point::new_scale(-2., 0.), Point::new_scale(0., 0.), Point::new_scale(2., 0.),
+                                                Point::new_scale(2., 2.), Point::new_scale(-2., 2.)})};
+    Polylines lines = separated_infill_lines();
+    join_close_ends(lines, scale_(0.8), false, region);
+    REQUIRE(lines.size() == 1);
+    for (const Point &point : lines.front().points)
+        CHECK(point.y() == 0);
+    CHECK_THAT(unscale<double>(lines.front().length()), Catch::Matchers::WithinAbs(3., 1e-6));
+}
+
+TEST_CASE("Infill joins do not span gaps between collinear boundary edges", "[Fill][InfillContainment][TravelOptimization][Regression]")
+{
+    const ExPolygons region {
+        ExPolygon(Points {Point::new_scale(-2., 0.), Point::new_scale(-0.2, 0.),
+                           Point::new_scale(-0.2, 2.), Point::new_scale(-2., 2.)}),
+        ExPolygon(Points {Point::new_scale(0.2, 0.), Point::new_scale(2., 0.),
+                           Point::new_scale(2., 2.), Point::new_scale(0.2, 2.)})};
+    Polylines lines = separated_infill_lines();
+    join_close_ends(lines, scale_(0.8), false, region);
+    REQUIRE(lines.size() == 2);
+    CHECK_THAT(unscale<double>(lines[0].length() + lines[1].length()), Catch::Matchers::WithinAbs(2.6, 1e-6));
+}
+
+TEST_CASE("Sparse infill joins respect regions disconnected by the fill inset", "[Fill][InfillContainment][TravelOptimization][Regression]")
+{
+    const int multiline = GENERATE(1, 2);
+    CAPTURE(multiline);
+    // A thin neck connects the two lobes in the original surface, but not in
+    // the half-spacing inset used to clip the fill. An original-polygon-only
+    // or bounding-box check would wrongly allow the connector through the neck.
+    const ExPolygon region(Points {
+        Point::new_scale(-2., -1.), Point::new_scale(-0.2, -1.), Point::new_scale(-0.2, -0.1),
+        Point::new_scale(0.2, -0.1), Point::new_scale(0.2, -1.), Point::new_scale(2., -1.),
+        Point::new_scale(2., 1.), Point::new_scale(0.2, 1.), Point::new_scale(0.2, 0.1),
+        Point::new_scale(-0.2, 0.1), Point::new_scale(-0.2, 1.), Point::new_scale(-2., 1.) });
+    PrescribedSparseFill fill;
+    fill.spacing = 1.;
+    fill.overlap = multiline == 1 ? 0. : 0.5;
+    fill.paths = {Polyline(Point::new_scale(-1.4, 0.), Point::new_scale(-0.8, 0.)),
+                  Polyline(Point::new_scale(0.8, 0.), Point::new_scale(1.4, 0.))};
+    const Polylines printed = prescribed_sparse_extrusions(fill, region, multiline);
+    CHECK(printed.size() == 2);
+    CHECK(diff_pl(printed, offset_ex(region, -float(scale_(0.5)))).empty());
+}
+
+TEST_CASE("Sparse infill joins retain the inset used before spacing adjustment", "[Fill][InfillContainment][TravelOptimization][Regression]")
+{
+    const ExPolygon region(Points {Point::new_scale(-2., 0.), Point::new_scale(2., 0.),
+                                   Point::new_scale(2., 2.), Point::new_scale(-2., 2.)});
+    PrescribedSparseFill fill;
+    fill.spacing = 0.4;
+    fill.spacing_after_generation = 0.8;
+    fill.paths = separated_infill_lines(0.2, 0.3);
+    const Polylines printed = prescribed_sparse_extrusions(fill, region);
+    REQUIRE(printed.size() == 1);
+    CHECK(diff_pl(printed, offset_ex(region, -float(scale_(0.2)))).empty());
+    CHECK_THAT(unscale<double>(printed.front().length()), Catch::Matchers::WithinAbs(3., 1e-6));
+}
+
+TEST_CASE("Sparse infill does not fall back to joins when its inset is empty", "[Fill][InfillContainment][TravelOptimization][Regression]")
+{
+    const ExPolygon region(Points {Point::new_scale(-2., 0.), Point::new_scale(2., 0.),
+                                   Point::new_scale(2., 0.2), Point::new_scale(-2., 0.2)});
+    PrescribedSparseFill fill;
+    fill.spacing = 1.;
+    fill.paths = separated_infill_lines(0.2, 0.1);
+    const Polylines printed = prescribed_sparse_extrusions(fill, region);
+    CHECK(printed.size() == 2);
+    CHECK(diff_pl(printed, region).empty());
 }

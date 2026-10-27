@@ -240,7 +240,9 @@ public:
    void multiline_fill(Polylines& polylines, const FillParams& params, float spacing);
    // Joins polylines whose ends are at most max_gap apart, shortest gaps first and without closing a loop, so each such
    // group prints as one path. Without can_reverse only the end of one polyline joins the start of another.
-   void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse);
+   // Every new connector must be covered by permitted_region (including its holes).
+   // Without a supplied region, leave the paths unchanged rather than assume a join is safe.
+   void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse, const ExPolygons &permitted_region = {});
 } // namespace Slic3r
 
 #endif // slic3r_FillBase_hpp_
