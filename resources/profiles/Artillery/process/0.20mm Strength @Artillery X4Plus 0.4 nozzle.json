@@ -5,7 +5,9 @@
 	"from": "system",
 	"setting_id": "f3IylWXlIgJGcZVl",
 	"instantiation": "true",
-	"outer_wall_speed": "60",
+	"outer_wall_speed": [
+		"75"
+	],
 	"print_settings_id": "0.20mm Strength @Artillery X4Plus 0.4 nozzle",
-	"wall_loops": "6"
+	"wall_loops": "3"
 }

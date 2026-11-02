@@ -7,22 +7,32 @@
 	"instantiation": "true",
 	"layer_height": "0.2",
 	"initial_layer_print_height": "0.3",
-	"line_width": "0.4",
-	"initial_layer_line_width": "0.4",
-	"outer_wall_line_width": "0.4",
-	"inner_wall_line_width": "0.4",
-	"top_surface_line_width": "0.4",
-	"sparse_infill_line_width": "0.4",
-	"internal_solid_infill_line_width": "0.4",
-	"support_line_width": "0.4",
-	"initial_layer_speed": "50",
+	"line_width": "105%",
+	"initial_layer_line_width": "120%",
+	"outer_wall_line_width": "105%",
+	"inner_wall_line_width": "115%",
+	"top_surface_line_width": "100%",
+	"sparse_infill_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
+	"support_line_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
 	"initial_layer_acceleration": "100",
-	"initial_layer_infill_speed": "60",
-	"initial_layer_travel_speed": "200",
-	"outer_wall_speed": "80",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_travel_speed": [
+		"100%"
+	],
+	"outer_wall_speed": [
+		"75"
+	],
 	"inner_wall_speed": "120",
 	"internal_solid_infill_speed": "80",
-	"top_surface_speed": "60",
+	"top_surface_speed": [
+		"60"
+	],
 	"gap_infill_speed": "80",
 	"support_speed": "120",
 	"top_surface_acceleration": "100",
@@ -39,24 +49,46 @@
 	"overhang_3_4_speed": "70",
 	"overhang_4_4_speed": "50",
 	"skirt_speed": "40",
-	"wall_sequence": "outer wall/inner wall",
+	"wall_sequence": "inner-outer-inner wall",
 	"enable_arc_fitting": "0",
 	"initial_layer_min_bead_width": "100",
-	"min_bead_width": "100",
+	"min_bead_width": "85%",
 	"elefant_foot_compensation": "0.15",
 	"small_perimeter_speed": "50%",
 	"overhang_speed_classic": "0",
-	"internal_bridge_speed": "60",
+	"internal_bridge_speed": [
+		"150%"
+	],
 	"accel_to_decel_enable": "0",
-	"filter_out_gap_fill": "0.5",
+	"filter_out_gap_fill": "0",
 	"gcode_label_objects": "0",
-	"slow_down_layers": "1",
+	"slow_down_layers": "0",
 	"wipe_speed": "200",
-	"reduce_crossing_wall": "1",
+	"reduce_crossing_wall": "0",
 	"max_travel_detour_distance": "50",
 	"compatible_printers": [
 		"Flashforge Adventurer 4 Series HS Nozzle"
 	],
 	"filename_format": "{input_filename_base}.gcode",
-	"post_process": ""
+	"post_process": "",
+	"bottom_shell_thickness": "0.8",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_pattern": "tpmsd",
+	"top_shell_thickness": "1.2",
+	"wall_generator": "arachne",
+	"wall_loops": "3",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25"
 }

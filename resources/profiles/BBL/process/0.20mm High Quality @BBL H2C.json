@@ -6,7 +6,7 @@
 	"setting_id": "GP251",
 	"instantiation": "true",
 	"description": "High quality profile for 0.2mm layer height, prioritizing strength and print quality.",
-	"bottom_shell_layers": "4",
+	"bottom_shell_layers": "3",
 	"default_acceleration": [
 		"4000",
 		"4000",
@@ -15,10 +15,10 @@
 	],
 	"enable_tower_interface_features": "1",
 	"initial_layer_speed": [
-		"50",
-		"50",
-		"50",
-		"50"
+		"30",
+		"30",
+		"30",
+		"30"
 	],
 	"inner_wall_speed": [
 		"150",
@@ -39,10 +39,10 @@
 		"2000"
 	],
 	"outer_wall_speed": [
-		"60",
-		"60",
-		"60",
-		"60"
+		"75",
+		"75",
+		"75",
+		"75"
 	],
 	"overhang_2_4_speed": [
 		"30",
@@ -70,14 +70,69 @@
 		"200",
 		"200"
 	],
-	"top_shell_layers": "6",
+	"top_shell_layers": "5",
 	"top_surface_speed": [
-		"150",
-		"150",
-		"150",
-		"150"
+		"60",
+		"60",
+		"60",
+		"60"
 	],
 	"compatible_printers": [
 		"Bambu Lab H2C 0.4 nozzle"
-	]
+	],
+	"bottom_shell_thickness": "0.8",
+	"bridge_speed": [
+		"5",
+		"5",
+		"5",
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_arc_fitting": "0",
+	"enable_overhang_speed": [
+		"0",
+		"0",
+		"0",
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"initial_layer_infill_speed": [
+		"30",
+		"30",
+		"30",
+		"30"
+	],
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_travel_speed": [
+		"100%",
+		"100%",
+		"100%",
+		"100%"
+	],
+	"inner_wall_line_width": "115%",
+	"internal_bridge_speed": [
+		"150%",
+		"150%",
+		"150%",
+		"150%"
+	],
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"outer_wall_line_width": "105%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"sparse_infill_pattern": "tpmsd",
+	"support_line_width": "100%",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"wall_generator": "arachne",
+	"wall_loops": "3",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

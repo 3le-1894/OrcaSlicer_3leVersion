@@ -7,8 +7,8 @@
 	"instantiation": "true",
 	"description": "Lower-acceleration profile for the 0.4mm nozzle. Use it when the printer sits on a wobbly desk or shelf",
 	"bridge_speed": [
-		"50",
-		"50"
+		"5",
+		"5"
 	],
 	"default_acceleration": [
 		"3500",
@@ -21,8 +21,8 @@
 		"1"
 	],
 	"enable_overhang_speed": [
-		"1",
-		"1"
+		"0",
+		"0"
 	],
 	"gap_infill_speed": [
 		"150",
@@ -33,12 +33,12 @@
 		"500"
 	],
 	"initial_layer_infill_speed": [
-		"105",
-		"105"
+		"30",
+		"30"
 	],
 	"initial_layer_speed": [
-		"50",
-		"100"
+		"30",
+		"30"
 	],
 	"initial_layer_travel_acceleration": [
 		"5000",
@@ -61,8 +61,8 @@
 		"5000"
 	],
 	"outer_wall_speed": [
-		"150",
-		"200"
+		"75",
+		"75"
 	],
 	"overhang_1_4_speed": [
 		"0",
@@ -142,17 +142,14 @@
 		"150",
 		"150"
 	],
-	"top_solid_infill_flow_ratio": [
-		"1",
-		"1"
-	],
+	"top_solid_infill_flow_ratio": "1",
 	"top_surface_acceleration": [
 		"2000",
 		"2000"
 	],
 	"top_surface_speed": [
-		"150",
-		"200"
+		"60",
+		"60"
 	],
 	"travel_acceleration": [
 		"4000",
@@ -176,5 +173,37 @@
 	],
 	"compatible_printers": [
 		"Bambu Lab A2L 0.4 nozzle"
-	]
+	],
+	"bottom_shell_thickness": "0.8",
+	"detect_narrow_internal_solid_infill": "0",
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_travel_speed": [
+		"100%",
+		"100%"
+	],
+	"inner_wall_line_width": "115%",
+	"internal_bridge_speed": [
+		"150%",
+		"150%"
+	],
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"outer_wall_line_width": "105%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"sparse_infill_pattern": "tpmsd",
+	"support_line_width": "100%",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"wall_generator": "arachne",
+	"wall_loops": "3",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

@@ -8,13 +8,13 @@
 	"layer_height": "0.2",
 	"inital_layer_height": "0.3",
 	"wall_count": "4",
-	"top_shell_layers": "4",
+	"top_shell_layers": "5",
 	"bottom_shell_layers": "3",
-	"top_shell_thickness": "0",
-	"sparse_infill_density": "25%",
-	"infill_anchor": "600%",
-	"infill_anchor_max": "5",
-	"infill_combination": "1",
+	"top_shell_thickness": "1.2",
+	"sparse_infill_density": "15%",
+	"infill_anchor": "400%",
+	"infill_anchor_max": "20",
+	"infill_combination": "0",
 	"skirt_loops": "2",
 	"skirt_distance": "10",
 	"support_threshold_angle": "65",
@@ -23,16 +23,24 @@
 	"support_object_xy_distance": "60%",
 	"inner_wall_speed": "350",
 	"small_perimeter_speed": "250",
-	"outer_wall_speed": "250",
+	"outer_wall_speed": [
+		"75"
+	],
 	"sparse_infill_speed": "400",
 	"internal_solid_infill_speed": "100%",
-	"top_surface_speed": "100%",
+	"top_surface_speed": [
+		"60"
+	],
 	"support_speed": "50",
 	"support_interface_speed": "100%",
-	"bridge_speed": "50",
+	"bridge_speed": [
+		"5"
+	],
 	"gap_infill_speed": "200",
 	"travel_speed": "500",
-	"initial_layer_speed": "50",
+	"initial_layer_speed": [
+		"30"
+	],
 	"outer_wall_acceleration": "4000",
 	"inner_wall_acceleration": "8000",
 	"top_surface_acceleration": "0",
@@ -42,21 +50,43 @@
 	"initial_layer_acceleration": "1500",
 	"travel_acceleration": "10000",
 	"default_acceleration": "10000",
-	"line_width": "0.55",
-	"initial_layer_line_width": "0.7",
-	"inner_wall_line_width": "0.55",
-	"outer_wall_line_width": "0.52",
-	"sparse_infill_line_width": "0.55",
-	"internal_solid_infill_line_width": "0.55",
-	"top_surface_line_width": "0.55",
-	"support_line_width": "0.55",
-	"infill_wall_overlap": "18%",
+	"line_width": "105%",
+	"initial_layer_line_width": "120%",
+	"inner_wall_line_width": "115%",
+	"outer_wall_line_width": "105%",
+	"sparse_infill_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
+	"top_surface_line_width": "100%",
+	"support_line_width": "100%",
+	"infill_wall_overlap": "15%",
 	"bridge_flow": "0.85",
-	"resolution": "0.0125",
+	"resolution": "0.003",
 	"elefant_foot_compensation": "0.1",
 	"compatible_printers": [
 		"RatRig V-Core 4 300 0.5 nozzle",
 		"RatRig V-Core 4 400 0.5 nozzle",
 		"RatRig V-Core 4 500 0.5 nozzle"
-	]
+	],
+	"bottom_shell_thickness": "0.8",
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_min_bead_width": "100%",
+	"internal_bridge_speed": [
+		"150%"
+	],
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"only_one_wall_top": "1",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_pattern": "tpmsd",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

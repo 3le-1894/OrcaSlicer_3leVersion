@@ -5,9 +5,11 @@
 	"from": "system",
 	"setting_id": "pUmli2ME3h4kTilQ",
 	"instantiation": "true",
-	"outer_wall_speed": "25",
-	"sparse_infill_density": "25%",
-	"wall_loops": "6",
+	"outer_wall_speed": [
+		"75"
+	],
+	"sparse_infill_density": "15%",
+	"wall_loops": "3",
 	"compatible_printers": [
 		"Geeetech A10 Pro 0.4 nozzle",
 		"Geeetech A10 M 0.4 nozzle",
@@ -23,5 +25,46 @@
 		"Geeetech Mizar Pro 0.4 nozzle",
 		"Geeetech Mizar Max 0.4 nozzle",
 		"Geeetech Mizar M 0.4 nozzle"
-	]
+	],
+	"bottom_shell_layers": "3",
+	"bottom_shell_thickness": "0.8",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"infill_wall_overlap": "15%",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"inner_wall_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"only_one_wall_top": "1",
+	"outer_wall_line_width": "105%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"sparse_infill_pattern": "tpmsd",
+	"support_line_width": "100%",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"top_surface_pattern": "monotonicline",
+	"top_surface_speed": [
+		"60"
+	],
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

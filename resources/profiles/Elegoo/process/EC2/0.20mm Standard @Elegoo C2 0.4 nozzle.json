@@ -6,9 +6,9 @@
 	"setting_id": "o5VRrzeZKCg339d5",
 	"instantiation": "true",
 	"bottom_shell_layers": "3",
-	"bottom_shell_thickness": "0.6",
+	"bottom_shell_thickness": "0.8",
 	"filename_format": "EC2_{nozzle_diameter[0]}_{input_filename_base}_{filament_name}_{layer_height}_{print_time}.gcode",
-	"min_width_top_surface": "50%",
+	"min_width_top_surface": "100%",
 	"enable_prime_tower": "1",
 	"compatible_printers": [
 		"Elegoo Centauri 2 0.4 nozzle"
@@ -20,15 +20,55 @@
 	"support_base_pattern_spacing": "1",
 	"support_bottom_z_distance": "0.2",
 	"support_top_z_distance": "0.2",
-	"top_solid_infill_flow_ratio": "1.09",
+	"top_solid_infill_flow_ratio": "1",
 	"support_type": "tree(auto)",
 	"tree_support_branch_distance_organic": "2",
 	"tree_support_tip_diameter": "0.8",
-	"wall_sequence": "inner wall/outer wall",
+	"wall_sequence": "inner-outer-inner wall",
 	"reduce_infill_retraction": "0",
 	"initial_layer_acceleration": "500",
-	"outer_wall_speed": "160",
-	"sparse_infill_pattern": "rectilinear",
+	"outer_wall_speed": [
+		"75"
+	],
+	"sparse_infill_pattern": "tpmsd",
 	"top_surface_acceleration": "2000",
-	"support_base_pattern": "rectilinear"
+	"support_base_pattern": "rectilinear",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"filter_out_gap_fill": "0",
+	"gap_fill_target": "topbottom",
+	"infill_anchor_max": "20",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"inner_wall_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_feature_size": "15%",
+	"outer_wall_line_width": "105%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"support_line_width": "100%",
+	"top_bottom_infill_wall_overlap": "25%",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"top_surface_speed": [
+		"60"
+	],
+	"wall_generator": "arachne",
+	"wall_loops": "3",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25"
 }

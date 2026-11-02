@@ -5,7 +5,7 @@
 	"from": "system",
 	"setting_id": "oM72sw3mW85qL45A",
 	"instantiation": "true",
-	"bottom_shell_layers": "4",
+	"bottom_shell_layers": "3",
 	"bridge_flow": "1",
 	"default_acceleration": [
 		"10000"
@@ -28,7 +28,7 @@
 		"3000"
 	],
 	"outer_wall_speed": [
-		"60"
+		"75"
 	],
 	"overhang_2_4_speed": [
 		"50"
@@ -45,13 +45,47 @@
 	],
 	"sparse_infill_density": "15%",
 	"top_color_penetration_layers": "5",
-	"top_shell_layers": "6",
-	"top_shell_thickness": "1.0",
+	"top_shell_layers": "5",
+	"top_shell_thickness": "1.2",
 	"top_surface_speed": [
-		"200"
+		"60"
 	],
-	"wall_loops": "2",
+	"wall_loops": "3",
 	"compatible_printers": [
 		"Qidi X-Max 4 0.4 nozzle"
-	]
+	],
+	"bottom_shell_thickness": "0.8",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"inner_wall_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"outer_wall_line_width": "105%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"sparse_infill_pattern": "tpmsd",
+	"support_line_width": "100%",
+	"top_surface_line_width": "100%",
+	"wall_generator": "arachne",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

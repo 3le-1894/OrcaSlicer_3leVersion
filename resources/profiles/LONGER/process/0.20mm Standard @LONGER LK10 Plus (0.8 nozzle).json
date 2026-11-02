@@ -7,21 +7,58 @@
 	"instantiation": "true",
 	"layer_height": "0.2",
 	"bottom_shell_layers": "3",
-	"outer_wall_line_width": "0.8",
-	"line_width": "0.8",
-	"initial_layer_line_width": "0.82",
-	"sparse_infill_line_width": "0.85",
-	"inner_wall_line_width": "0.85",
-	"internal_solid_infill_line_width": "0.85",
-	"support_line_width": "0.38",
-	"top_surface_line_width": "0.78",
-	"top_shell_layers": "4",
-	"top_shell_thickness": "0.8",
+	"outer_wall_line_width": "105%",
+	"line_width": "105%",
+	"initial_layer_line_width": "120%",
+	"sparse_infill_line_width": "115%",
+	"inner_wall_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
+	"support_line_width": "100%",
+	"top_surface_line_width": "100%",
+	"top_shell_layers": "5",
+	"top_shell_thickness": "1.2",
 	"initial_layer_print_height": "0.2",
 	"support_top_z_distance": "0.2",
 	"compatible_printers": [
 		"LONGER LK10 Plus (0.8 nozzle)"
 	],
 	"start_gcode": "START_PRINT BED_TEMP={first_layer_bed_temperature[0]} EXTRUDER_TEMP_1ST={first_layer_temperature[0]} EXTRUDER_TEMP={temperature[0]} FILAMENT_DIAMETER={filament_diameter[0]}\nG92 E0\nG1 X2 Y2 F6000\nG1 Z0.28 F1000\nG1 X300 E15 F1000\nG1 E-0.8 F1800\n",
-	"end_gcode": "END_PRINT\n"
+	"end_gcode": "END_PRINT\n",
+	"bottom_shell_thickness": "0.8",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"infill_wall_overlap": "15%",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"internal_bridge_speed": [
+		"150%"
+	],
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"minimum_sparse_infill_area": "15",
+	"only_one_wall_top": "1",
+	"outer_wall_speed": [
+		"75"
+	],
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_pattern": "tpmsd",
+	"top_surface_speed": [
+		"60"
+	],
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

@@ -11,5 +11,50 @@
 	"layer_height": "0.2",
 	"initial_layer_print_height": "0.2",
 	"bottom_shell_layers": "3",
-	"top_shell_layers": "3"
+	"top_shell_layers": "5",
+	"bottom_shell_thickness": "0.8",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"initial_layer_travel_speed": [
+		"100%"
+	],
+	"inner_wall_line_width": "115%",
+	"internal_bridge_speed": [
+		"150%"
+	],
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_feature_size": "15%",
+	"outer_wall_line_width": "105%",
+	"outer_wall_speed": [
+		"75"
+	],
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"sparse_infill_pattern": "tpmsd",
+	"support_line_width": "100%",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"top_surface_speed": [
+		"60"
+	],
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

@@ -9,7 +9,7 @@
 	"elefant_foot_compensation": "0.1",
 	"enable_prime_tower": "1",
 	"exclude_object": "1",
-	"filter_out_gap_fill": "0.1",
+	"filter_out_gap_fill": "0",
 	"gap_fill_target": "topbottom",
 	"compatible_printers": [
 		"Flashforge AD5X 0.4 nozzle"

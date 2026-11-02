@@ -61,5 +61,25 @@
 	"wipe_tower_cone_angle": "12",
 	"wipe_tower_extra_rib_length": "10",
 	"wipe_tower_extra_spacing": "120%",
-	"wipe_tower_wall_type": "cone"
+	"wipe_tower_wall_type": "cone",
+	"bottom_shell_thickness": "0",
+	"bridge_speed": "25",
+	"detect_narrow_internal_solid_infill": "1",
+	"enable_overhang_speed": [
+		"1"
+	],
+	"ensure_vertical_shell_thickness": "ensure_all",
+	"initial_layer_min_bead_width": "85%",
+	"internal_bridge_speed": "50",
+	"min_feature_size": "25%",
+	"min_width_top_surface": "300%",
+	"resolution": "0.012",
+	"slice_closing_radius": "0.049",
+	"slow_down_layers": "1",
+	"top_shell_thickness": "1",
+	"wall_generator": "classic",
+	"wall_loops": "2",
+	"wall_maximum_deviation": "0.025",
+	"wall_maximum_resolution": "0.5",
+	"wall_sequence": "inner wall/outer wall"
 }

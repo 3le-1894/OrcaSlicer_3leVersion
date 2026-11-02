@@ -8,13 +8,21 @@
 	"filename_format": "{nozzle_diameter[0]}{input_filename_base}_{filament_name}_{layer_height}_{print_time}.gcode",
 	"default_acceleration": "1000",
 	"gap_infill_speed": "30",
-	"initial_layer_infill_speed": "50",
-	"initial_layer_speed": "30",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_speed": [
+		"30"
+	],
 	"inner_wall_speed": "60",
-	"internal_bridge_speed": "100%",
+	"internal_bridge_speed": [
+		"150%"
+	],
 	"internal_solid_infill_speed": "60",
 	"outer_wall_acceleration": "500",
-	"outer_wall_speed": "30",
+	"outer_wall_speed": [
+		"75"
+	],
 	"overhang_2_4_speed": "30",
 	"overhang_3_4_speed": "20",
 	"skirt_speed": "30",
@@ -22,9 +30,11 @@
 	"support_interface_speed": "30",
 	"support_speed": "60",
 	"top_surface_acceleration": "1000",
-	"top_surface_speed": "30",
+	"top_surface_speed": [
+		"60"
+	],
 	"travel_speed": "200",
-	"only_one_wall_top": "0",
+	"only_one_wall_top": "1",
 	"wall_loops": "3",
 	"enable_arc_fitting": "0",
 	"compatible_printers": [
@@ -35,5 +45,37 @@
 		"Elegoo Neptune 2D 0.4 nozzle",
 		"Elegoo Neptune 0.4 nozzle"
 	],
-	"renamed_from": "0.20mm Standard @Elegoo Neptune;0.20mm Standard @Elegoo Neptune2;0.20mm Standard @Elegoo Neptune2D;0.20mm Standard @Elegoo Neptune2S;0.20mm Standard @Elegoo NeptuneX"
+	"renamed_from": "0.20mm Standard @Elegoo Neptune;0.20mm Standard @Elegoo Neptune2;0.20mm Standard @Elegoo Neptune2D;0.20mm Standard @Elegoo Neptune2S;0.20mm Standard @Elegoo NeptuneX",
+	"bottom_shell_layers": "3",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"filter_out_gap_fill": "0",
+	"gap_fill_target": "topbottom",
+	"infill_anchor_max": "20",
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"inner_wall_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"outer_wall_line_width": "105%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"sparse_infill_pattern": "tpmsd",
+	"support_line_width": "100%",
+	"top_bottom_infill_wall_overlap": "25%",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"wall_generator": "arachne",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

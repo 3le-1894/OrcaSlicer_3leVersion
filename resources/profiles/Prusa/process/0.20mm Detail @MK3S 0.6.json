@@ -6,16 +6,18 @@
 	"setting_id": "dTfnuXbwKxIxw9Ed",
 	"instantiation": "true",
 	"print_settings_id": "0.20mm Detail @MK3S 0.6",
-	"bottom_shell_layers": "4",
+	"bottom_shell_layers": "3",
 	"bridge_acceleration": "1000",
-	"bridge_speed": "25",
+	"bridge_speed": [
+		"5"
+	],
 	"gap_infill_speed": "40",
 	"inner_wall_acceleration": "800",
 	"inner_wall_speed": "60",
 	"layer_height": "0.2",
 	"raft_contact_distance": "0.2",
 	"sparse_infill_acceleration": "1000",
-	"sparse_infill_pattern": "crosshatch",
+	"sparse_infill_pattern": "tpmsd",
 	"support_base_pattern_spacing": "2",
 	"support_bottom_z_distance": "0.2",
 	"support_interface_speed": "40",
@@ -23,28 +25,56 @@
 	"support_top_z_distance": "0.2",
 	"thick_bridges": "0",
 	"top_shell_layers": "5",
-	"bottom_shell_thickness": "0.6",
+	"bottom_shell_thickness": "0.8",
 	"bridge_flow": "1",
 	"elefant_foot_compensation": "0.2",
 	"infill_wall_overlap": "15%",
-	"initial_layer_infill_speed": "40",
-	"initial_layer_line_width": "0.65",
-	"inner_wall_line_width": "0.65",
-	"internal_solid_infill_line_width": "0.65",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_line_width": "120%",
+	"inner_wall_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
 	"internal_solid_infill_speed": "70",
-	"line_width": "0.65",
-	"outer_wall_line_width": "0.65",
-	"outer_wall_speed": "45",
+	"line_width": "105%",
+	"outer_wall_line_width": "105%",
+	"outer_wall_speed": [
+		"75"
+	],
 	"small_perimeter_speed": "35",
-	"sparse_infill_line_width": "0.65",
+	"sparse_infill_line_width": "115%",
 	"sparse_infill_speed": "70",
-	"support_line_width": "0.55",
+	"support_line_width": "100%",
 	"support_speed": "40",
-	"top_shell_thickness": "0.9",
-	"top_surface_line_width": "0.6",
-	"top_surface_speed": "45",
-	"wall_loops": "2",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"top_surface_speed": [
+		"60"
+	],
+	"wall_loops": "3",
 	"compatible_printers": [
 		"Prusa MK3S 0.6 nozzle"
-	]
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"infill_anchor": "400%",
+	"infill_anchor_max": "20",
+	"infill_combination": "0",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"minimum_sparse_infill_area": "15",
+	"only_one_wall_top": "1",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

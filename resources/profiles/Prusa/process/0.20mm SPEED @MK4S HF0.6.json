@@ -11,7 +11,9 @@
 	"inner_wall_speed": "200",
 	"internal_solid_infill_speed": "200",
 	"outer_wall_acceleration": "4000",
-	"outer_wall_speed": "200",
+	"outer_wall_speed": [
+		"75"
+	],
 	"small_perimeter_speed": "170",
 	"sparse_infill_speed": "200",
 	"support_interface_speed": "55",

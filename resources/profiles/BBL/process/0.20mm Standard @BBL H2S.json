@@ -7,16 +7,16 @@
 	"instantiation": "true",
 	"description": "It has a general layer height, and results in general layer lines and printing quality. It is suitable for most general printing cases.",
 	"bridge_speed": [
-		"50",
-		"50"
+		"5",
+		"5"
 	],
 	"default_acceleration": [
 		"10000",
 		"10000"
 	],
 	"enable_overhang_speed": [
-		"1",
-		"1"
+		"0",
+		"0"
 	],
 	"enable_height_slowdown": [
 		"0",
@@ -27,12 +27,12 @@
 		"150"
 	],
 	"initial_layer_infill_speed": [
-		"105",
-		"105"
+		"30",
+		"30"
 	],
 	"initial_layer_speed": [
-		"50",
-		"50"
+		"30",
+		"30"
 	],
 	"inner_wall_speed": [
 		"300",
@@ -55,8 +55,8 @@
 		"6000"
 	],
 	"outer_wall_speed": [
-		"200",
-		"500"
+		"75",
+		"75"
 	],
 	"outer_wall_acceleration": [
 		"5000",
@@ -150,8 +150,8 @@
 		"2000"
 	],
 	"top_surface_speed": [
-		"200",
-		"200"
+		"60",
+		"60"
 	],
 	"travel_speed_z": [
 		"0",
@@ -167,5 +167,38 @@
 	],
 	"compatible_printers": [
 		"Bambu Lab H2S 0.4 nozzle"
-	]
+	],
+	"bottom_shell_thickness": "0.8",
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_arc_fitting": "0",
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_travel_speed": [
+		"100%",
+		"100%"
+	],
+	"inner_wall_line_width": "115%",
+	"internal_bridge_speed": [
+		"150%",
+		"150%"
+	],
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"outer_wall_line_width": "105%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"sparse_infill_pattern": "tpmsd",
+	"support_line_width": "100%",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"wall_generator": "arachne",
+	"wall_loops": "3",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

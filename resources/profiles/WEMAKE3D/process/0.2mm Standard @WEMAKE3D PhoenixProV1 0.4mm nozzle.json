@@ -6,18 +6,57 @@
 	"instantiation": "true",
 	"layer_height": "0.2",
 	"initial_layer_print_height": "0.32",
-	"initial_layer_line_width": "0.5",
-	"internal_solid_infill_line_width": "0.5",
-	"inner_wall_line_width": "0.5",
-	"sparse_infill_line_width": "0.5",
-	"line_width": "0.42",
-	"outer_wall_line_width": "0.42",
-	"top_surface_line_width": "0.42",
-	"support_line_width": "0.5",
+	"initial_layer_line_width": "120%",
+	"internal_solid_infill_line_width": "110%",
+	"inner_wall_line_width": "115%",
+	"sparse_infill_line_width": "115%",
+	"line_width": "105%",
+	"outer_wall_line_width": "105%",
+	"top_surface_line_width": "100%",
+	"support_line_width": "100%",
 	"thick_bridges": "1",
 	"print_settings_id": "0.2mm Standard @WEMAKE3D PhoenixProV1 0.4mm nozzle",
 	"wall_sequence": "inner-outer-inner wall",
 	"compatible_printers": [
 		"WEMAKE3D PhoenixProV1 0.4mm nozzle"
-	]
+	],
+	"bottom_shell_layers": "3",
+	"bottom_shell_thickness": "0.8",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_arc_fitting": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"infill_wall_overlap": "15%",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"only_one_wall_top": "1",
+	"outer_wall_speed": [
+		"75"
+	],
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"slow_down_layers": "0",
+	"sparse_infill_pattern": "tpmsd",
+	"top_bottom_infill_wall_overlap": "25%",
+	"top_shell_layers": "5",
+	"top_shell_thickness": "1.2",
+	"top_surface_speed": [
+		"60"
+	],
+	"wall_generator": "arachne",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25"
 }

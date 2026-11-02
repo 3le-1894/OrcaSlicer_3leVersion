@@ -8,12 +8,52 @@
 	"compatible_printers": [
 		"Prusa MK3.5 0.4 nozzle"
 	],
-	"line_width": "0.45",
-	"inner_wall_line_width": "0.45",
-	"outer_wall_line_width": "0.45",
-	"top_surface_line_width": "0.42",
-	"sparse_infill_line_width": "0.45",
-	"initial_layer_line_width": "0.5",
-	"internal_solid_infill_line_width": "0.45",
-	"support_line_width": "0.36"
+	"line_width": "105%",
+	"inner_wall_line_width": "115%",
+	"outer_wall_line_width": "105%",
+	"top_surface_line_width": "100%",
+	"sparse_infill_line_width": "115%",
+	"initial_layer_line_width": "120%",
+	"internal_solid_infill_line_width": "110%",
+	"support_line_width": "100%",
+	"bottom_shell_layers": "3",
+	"bottom_shell_thickness": "0.8",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_arc_fitting": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"infill_anchor_max": "20",
+	"infill_wall_overlap": "15%",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"internal_bridge_speed": [
+		"150%"
+	],
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"only_one_wall_top": "1",
+	"outer_wall_speed": [
+		"75"
+	],
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_pattern": "tpmsd",
+	"top_shell_thickness": "1.2",
+	"top_surface_speed": [
+		"60"
+	],
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

@@ -10,23 +10,29 @@
 	],
 	"layer_height": "0.20",
 	"initial_layer_print_height": "0.25",
-	"line_width": "0.68",
-	"inner_wall_line_width": "0.62",
-	"outer_wall_line_width": "0.62",
-	"top_surface_line_width": "0.5",
-	"sparse_infill_line_width": "0.62",
-	"initial_layer_line_width": "0.68",
-	"internal_solid_infill_line_width": "0.62",
-	"support_line_width": "0.5",
-	"wall_loops": "2",
-	"outer_wall_speed": "115",
+	"line_width": "105%",
+	"inner_wall_line_width": "115%",
+	"outer_wall_line_width": "105%",
+	"top_surface_line_width": "100%",
+	"sparse_infill_line_width": "115%",
+	"initial_layer_line_width": "120%",
+	"internal_solid_infill_line_width": "110%",
+	"support_line_width": "100%",
+	"wall_loops": "3",
+	"outer_wall_speed": [
+		"75"
+	],
 	"inner_wall_speed": "115",
 	"small_perimeter_speed": "115",
 	"sparse_infill_speed": "120",
 	"internal_solid_infill_speed": "100",
-	"top_surface_speed": "70",
+	"top_surface_speed": [
+		"60"
+	],
 	"gap_infill_speed": "80",
-	"bridge_speed": "40",
+	"bridge_speed": [
+		"5"
+	],
 	"travel_speed": "300",
 	"initial_layer_acceleration": "500",
 	"top_surface_acceleration": "1500",
@@ -39,5 +45,36 @@
 	"support_top_z_distance": "0.22",
 	"support_bottom_z_distance": "0.22",
 	"support_bottom_interface_spacing": "0.22",
-	"support_interface_spacing": "0.25"
+	"support_interface_spacing": "0.25",
+	"bottom_shell_layers": "3",
+	"bottom_shell_thickness": "0.8",
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_arc_fitting": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"infill_anchor_max": "20",
+	"infill_wall_overlap": "15%",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"internal_bridge_speed": [
+		"150%"
+	],
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"only_one_wall_top": "1",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_pattern": "tpmsd",
+	"top_shell_thickness": "1.2",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

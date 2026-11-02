@@ -10,36 +10,46 @@
 		"LH Stinger MMU 0.4 nozzle"
 	],
 	"accel_to_decel_factor": "90%",
-	"bottom_shell_layers": "5",
+	"bottom_shell_layers": "3",
 	"bridge_acceleration": "3000",
 	"bridge_density": "95%",
 	"bridge_flow": "1.1",
-	"bridge_speed": "30",
+	"bridge_speed": [
+		"5"
+	],
 	"brim_ears_max_angle": "180",
 	"brim_object_gap": "0.04",
 	"default_acceleration": "15000",
 	"default_jerk": "10",
-	"filter_out_gap_fill": "1",
+	"filter_out_gap_fill": "0",
 	"gap_infill_speed": "200",
 	"infill_jerk": "10",
-	"infill_wall_overlap": "10%",
-	"initial_layer_infill_speed": "100",
+	"infill_wall_overlap": "15%",
+	"initial_layer_infill_speed": [
+		"30"
+	],
 	"initial_layer_jerk": "10",
 	"initial_layer_print_height": "0.25",
-	"initial_layer_travel_speed": "250",
+	"initial_layer_travel_speed": [
+		"100%"
+	],
 	"inner_wall_acceleration": "15000",
 	"inner_wall_speed": "200",
 	"inner_wall_jerk": "10",
-	"inner_wall_line_width": "0.44",
-	"internal_bridge_speed": "50",
+	"inner_wall_line_width": "115%",
+	"internal_bridge_speed": [
+		"150%"
+	],
 	"internal_solid_infill_acceleration": "15000",
 	"internal_solid_infill_speed": "200",
-	"internal_solid_infill_line_width": "0.44",
-	"line_width": "0.44",
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
 	"max_travel_detour_distance": "50",
 	"outer_wall_jerk": "10",
-	"outer_wall_line_width": "0.44",
-	"outer_wall_speed": "200",
+	"outer_wall_line_width": "105%",
+	"outer_wall_speed": [
+		"75"
+	],
 	"overhang_1_4_speed": "60%",
 	"overhang_2_4_speed": "40",
 	"overhang_3_4_speed": "20",
@@ -52,23 +62,49 @@
 		"Direct Drive Standard"
 	],
 	"raft_first_layer_density": "60%",
-	"reduce_crossing_wall": "1",
+	"reduce_crossing_wall": "0",
 	"skirt_loops": "2",
-	"slow_down_layers": "2",
+	"slow_down_layers": "0",
 	"small_perimeter_threshold": "10",
 	"sparse_infill_acceleration": "15000",
 	"sparse_infill_speed": "200",
-	"sparse_infill_line_width": "0.44",
+	"sparse_infill_line_width": "115%",
 	"support_interface_speed": "200",
-	"support_line_width": "0.42",
+	"support_line_width": "100%",
 	"support_speed": "200",
-	"top_bottom_infill_wall_overlap": "18%",
-	"top_shell_layers": "6",
+	"top_bottom_infill_wall_overlap": "25%",
+	"top_shell_layers": "5",
 	"top_surface_acceleration": "5000",
 	"top_surface_jerk": "10",
-	"top_surface_speed": "130",
+	"top_surface_speed": [
+		"60"
+	],
 	"travel_jerk": "10",
 	"wall_loops": "3",
-	"gap_fill_target": "nowhere",
-	"wipe_tower_max_purge_speed": "150"
+	"gap_fill_target": "topbottom",
+	"wipe_tower_max_purge_speed": "150",
+	"bottom_shell_thickness": "0.8",
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"min_bead_width": "85%",
+	"min_feature_size": "15%",
+	"min_length_factor": "0.5",
+	"min_width_top_surface": "100%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_density": "15%",
+	"sparse_infill_pattern": "tpmsd",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"wall_generator": "arachne",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

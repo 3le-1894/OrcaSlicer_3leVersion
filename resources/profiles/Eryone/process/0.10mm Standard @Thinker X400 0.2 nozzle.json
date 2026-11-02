@@ -31,5 +31,27 @@
 	"compatible_printers": [
 		"Thinker X400 0.2 nozzle"
 	],
-	"wall_loops": "4"
+	"wall_loops": "4",
+	"bottom_shell_thickness": "0",
+	"bridge_speed": "45",
+	"detect_narrow_internal_solid_infill": "1",
+	"enable_arc_fitting": "1",
+	"enable_overhang_speed": "1",
+	"ensure_vertical_shell_thickness": "1",
+	"gap_fill_target": "nowhere",
+	"infill_wall_overlap": "25%",
+	"initial_layer_min_bead_width": "85%",
+	"initial_layer_travel_speed": "100%",
+	"internal_bridge_speed": "150%",
+	"min_feature_size": "25%",
+	"min_width_top_surface": "300%",
+	"resolution": "0.012",
+	"slice_closing_radius": "0.049",
+	"sparse_infill_pattern": "crosshatch",
+	"top_shell_thickness": "1",
+	"top_surface_pattern": "monotonic",
+	"wall_generator": "classic",
+	"wall_maximum_deviation": "0.025",
+	"wall_maximum_resolution": "0.5",
+	"wall_sequence": "inner wall/outer wall"
 }

@@ -6,7 +6,9 @@
 	"setting_id": "2tme6z6FUnpCpm4H",
 	"instantiation": "true",
 	"bridge_flow": "1.4",
-	"bridge_speed": "100",
+	"bridge_speed": [
+		"5"
+	],
 	"brim_type": "outer_only",
 	"enable_support": "1",
 	"exclude_object": "0",
@@ -14,19 +16,31 @@
 	"compatible_printers": [
 		"iQ TiQ8 0.4 Nozzle"
 	],
-	"internal_bridge_speed": "50%",
+	"internal_bridge_speed": [
+		"150%"
+	],
 	"internal_solid_infill_speed": "50",
 	"ironing_pattern": "concentric",
-	"bottom_shell_layers": "4",
-	"initial_layer_speed": "80",
-	"initial_layer_infill_speed": "80",
-	"outer_wall_speed": "90",
+	"bottom_shell_layers": "3",
+	"initial_layer_speed": [
+		"30"
+	],
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"outer_wall_speed": [
+		"75"
+	],
 	"inner_wall_speed": "140",
 	"sparse_infill_speed": "160",
-	"top_surface_speed": "140",
+	"top_surface_speed": [
+		"60"
+	],
 	"support_speed": "300",
 	"support_interface_speed": "100",
-	"enable_overhang_speed": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
 	"travel_speed": "300",
 	"default_acceleration": "600",
 	"outer_wall_acceleration": "600",
@@ -39,14 +53,14 @@
 	"prime_tower_width": "80",
 	"layer_height": "0.2",
 	"print_settings_id": "0.20mm Standard @iQ TiQ8 P1 - ABS Natur Material4Print (0.4 Nozzle)",
-	"reduce_crossing_wall": "1",
+	"reduce_crossing_wall": "0",
 	"skirt_height": "3",
 	"skirt_loops": "2",
-	"slow_down_layers": "1",
+	"slow_down_layers": "0",
 	"small_perimeter_speed": "5%",
 	"small_perimeter_threshold": "0",
-	"sparse_infill_density": "35%",
-	"sparse_infill_pattern": "triangles",
+	"sparse_infill_density": "15%",
+	"sparse_infill_pattern": "tpmsd",
 	"support_angle": "45",
 	"support_base_pattern": "default",
 	"support_base_pattern_spacing": "3",
@@ -64,11 +78,33 @@
 	"support_on_build_plate_only": "0",
 	"support_top_z_distance": "0.2",
 	"support_type": "normal(auto)",
-	"top_shell_thickness": "0",
-	"top_solid_infill_flow_ratio": "0.98",
+	"top_shell_thickness": "1.2",
+	"top_solid_infill_flow_ratio": "1",
 	"tree_support_branch_diameter_angle": "10",
 	"tree_support_branch_diameter_organic": "3",
 	"tree_support_tip_diameter": "2",
-	"wall_loops": "2",
-	"notes": "Process file version 1.0 20250620"
+	"wall_loops": "3",
+	"notes": "Process file version 1.0 20250620",
+	"bottom_shell_thickness": "0.8",
+	"detect_narrow_internal_solid_infill": "0",
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"infill_wall_overlap": "15%",
+	"initial_layer_min_bead_width": "100%",
+	"inner_wall_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"only_one_wall_top": "1",
+	"outer_wall_line_width": "105%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"support_line_width": "100%",
+	"top_shell_layers": "5",
+	"top_surface_line_width": "100%",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

@@ -9,11 +9,11 @@
 	"layer_height": "0.2",
 	"wall_loops": "3",
 	"top_shell_layers": "5",
-	"bottom_shell_layers": "4",
-	"top_shell_thickness": "0.7",
-	"bottom_shell_thickness": "0.5",
+	"bottom_shell_layers": "3",
+	"top_shell_thickness": "1.2",
+	"bottom_shell_thickness": "0.8",
 	"sparse_infill_density": "15%",
-	"infill_anchor": "1",
+	"infill_anchor": "400%",
 	"brim_object_gap": "0",
 	"support_threshold_angle": "40",
 	"raft_first_layer_density": "90%",
@@ -29,13 +29,19 @@
 	"tree_support_tip_diameter": "0.8",
 	"inner_wall_speed": "140",
 	"small_perimeter_speed": "120",
-	"outer_wall_speed": "120",
+	"outer_wall_speed": [
+		"75"
+	],
 	"sparse_infill_speed": "120",
 	"internal_solid_infill_speed": "200",
-	"top_surface_speed": "50",
+	"top_surface_speed": [
+		"60"
+	],
 	"support_speed": "100",
 	"support_interface_speed": "45%",
-	"bridge_speed": "30",
+	"bridge_speed": [
+		"5"
+	],
 	"gap_infill_speed": "50",
 	"overhang_1_4_speed": "80%",
 	"overhang_2_4_speed": "30",
@@ -50,18 +56,42 @@
 	"bridge_acceleration": "1000",
 	"initial_layer_acceleration": "500",
 	"travel_acceleration": "5000",
-	"line_width": "0.34",
-	"initial_layer_line_width": "0.4",
-	"inner_wall_line_width": "0.34",
-	"outer_wall_line_width": "0.34",
-	"sparse_infill_line_width": "0.34",
-	"internal_solid_infill_line_width": "0.34",
-	"top_surface_line_width": "0.3",
-	"support_line_width": "0.3",
+	"line_width": "105%",
+	"initial_layer_line_width": "120%",
+	"inner_wall_line_width": "115%",
+	"outer_wall_line_width": "105%",
+	"sparse_infill_line_width": "115%",
+	"internal_solid_infill_line_width": "110%",
+	"top_surface_line_width": "100%",
+	"support_line_width": "100%",
 	"infill_wall_overlap": "15%",
-	"resolution": "0.008",
+	"resolution": "0.003",
 	"elefant_foot_compensation": "0",
 	"compatible_printers": [
 		"Prusa XL 0.3 nozzle"
-	]
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_arc_fitting": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"ensure_vertical_shell_thickness": "ensure_critical_only",
+	"gap_fill_target": "topbottom",
+	"infill_anchor_max": "20",
+	"infill_combination": "0",
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_speed": [
+		"30"
+	],
+	"min_feature_size": "15%",
+	"min_width_top_surface": "100%",
+	"only_one_wall_top": "1",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_pattern": "tpmsd",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }

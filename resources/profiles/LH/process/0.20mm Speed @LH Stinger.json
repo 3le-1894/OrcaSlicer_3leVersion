@@ -11,15 +11,19 @@
 	],
 	"bridge_acceleration": "15000",
 	"default_acceleration": "30000",
-	"filter_out_gap_fill": "10",
-	"infill_wall_overlap": "10%",
-	"initial_layer_speed": "90",
+	"filter_out_gap_fill": "0",
+	"infill_wall_overlap": "15%",
+	"initial_layer_speed": [
+		"30"
+	],
 	"inner_wall_acceleration": "30000",
 	"inner_wall_speed": "600",
 	"internal_solid_infill_acceleration": "30000",
 	"internal_solid_infill_speed": "600",
 	"outer_wall_acceleration": "15000",
-	"outer_wall_speed": "600",
+	"outer_wall_speed": [
+		"75"
+	],
 	"print_extruder_id": [
 		"1"
 	],
@@ -28,16 +32,58 @@
 	],
 	"raft_first_layer_density": "80%",
 	"sparse_infill_acceleration": "30000",
-	"sparse_infill_pattern": "rectilinear",
+	"sparse_infill_pattern": "tpmsd",
 	"sparse_infill_speed": "600",
 	"support_bottom_z_distance": "0.15",
 	"support_expansion": "2",
 	"support_interface_top_layers": "3",
 	"support_object_xy_distance": "0.25",
 	"top_surface_acceleration": "15000",
-	"top_surface_speed": "300",
+	"top_surface_speed": [
+		"60"
+	],
 	"travel_acceleration": "30000",
 	"sparse_infill_density": "15%",
-	"gap_fill_target": "nowhere",
-	"travel_speed": "600"
+	"gap_fill_target": "topbottom",
+	"travel_speed": "600",
+	"bottom_shell_layers": "3",
+	"bottom_shell_thickness": "0.8",
+	"bridge_speed": [
+		"5"
+	],
+	"detect_narrow_internal_solid_infill": "0",
+	"enable_overhang_speed": [
+		"0"
+	],
+	"initial_layer_infill_speed": [
+		"30"
+	],
+	"initial_layer_line_width": "120%",
+	"initial_layer_min_bead_width": "100%",
+	"initial_layer_travel_speed": [
+		"100%"
+	],
+	"inner_wall_line_width": "115%",
+	"internal_bridge_speed": [
+		"150%"
+	],
+	"internal_solid_infill_line_width": "110%",
+	"line_width": "105%",
+	"min_bead_width": "85%",
+	"min_feature_size": "15%",
+	"min_length_factor": "0.5",
+	"min_width_top_surface": "100%",
+	"outer_wall_line_width": "105%",
+	"resolution": "0.003",
+	"slice_closing_radius": "0.01",
+	"sparse_infill_line_width": "115%",
+	"support_line_width": "100%",
+	"top_bottom_infill_wall_overlap": "25%",
+	"top_shell_thickness": "1.2",
+	"top_surface_line_width": "100%",
+	"wall_generator": "arachne",
+	"wall_loops": "3",
+	"wall_maximum_deviation": "0.01",
+	"wall_maximum_resolution": "0.25",
+	"wall_sequence": "inner-outer-inner wall"
 }
