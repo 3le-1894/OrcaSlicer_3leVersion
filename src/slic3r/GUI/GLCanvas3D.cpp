@@ -4593,8 +4593,11 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         // do not process the dragging if the left mouse was set down in another canvas
         else if (is_camera_rotate(evt, button_mappings)) {
 
+            // Avoid an explicit GTK pointer grab for Linux camera rotation.
+#if !defined(__linux__)
             if (!has_mouse_capture()) // ORCA keep tracking mouse position while drag active and cursor not in window bounds
                 m_canvas->CaptureMouse();
+#endif
 
             // Orca: Sphere rotation for painting view
             // if dragging over blank area with left button or other button mapped to rotate, then rotate
