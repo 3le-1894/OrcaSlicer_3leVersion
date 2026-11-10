@@ -6,7 +6,7 @@
 	"setting_id": "3ei5QadUbDuTI3hi",
 	"instantiation": "true",
 	"brim_type": "auto_brim",
-	"elefant_foot_compensation": "0.1",
+	"elefant_foot_compensation": "0.15",
 	"enable_prime_tower": "1",
 	"exclude_object": "1",
 	"filter_out_gap_fill": "0",

@@ -8,7 +8,7 @@
 	"bridge_speed": [
 		"5"
 	],
-	"elefant_foot_compensation": "0.1",
+	"elefant_foot_compensation": "0.15",
 	"enable_support": "0",
 	"filter_out_gap_fill": "0",
 	"compatible_printers": [
@@ -26,7 +26,7 @@
 	"only_one_wall_first_layer": "0",
 	"print_settings_id": "0.20mm Standard @FF G4 HF",
 	"resolution": "0.003",
-	"seam_gap": "5%",
+	"seam_gap": "10%",
 	"skirt_loops": "0",
 	"small_perimeter_speed": "10",
 	"sparse_infill_pattern": "tpmsd",

@@ -16,7 +16,7 @@
 	"bridge_speed": [
 		"5"
 	],
-	"brim_width": "0",
+	"brim_width": "5",
 	"brim_object_gap": "0",
 	"compatible_printers_condition": "",
 	"print_sequence": "by layer",
@@ -56,7 +56,7 @@
 	"wall_loops": "3",
 	"print_settings_id": "",
 	"raft_layers": "0",
-	"seam_position": "aligned",
+	"seam_position": "back",
 	"skirt_distance": "2",
 	"skirt_height": "1",
 	"skirt_loops": "2",
@@ -128,5 +128,21 @@
 	"slice_closing_radius": "0.01",
 	"wall_maximum_deviation": "0.01",
 	"wall_maximum_resolution": "0.25",
-	"wall_sequence": "inner-outer-inner wall"
+	"wall_sequence": "inner-outer-inner wall",
+	"brim_use_efc_outline": "1",
+	"combine_brims": "1",
+	"elefant_foot_layers_density": "90%",
+	"extrusion_rate_smoothing_external_perimeter_only": "1",
+	"max_volumetric_extrusion_rate_slope": "294",
+	"max_volumetric_extrusion_rate_slope_segment_length": "1",
+	"precise_outer_wall": "0",
+	"role_based_wipe_speed": "0",
+	"scarf_angle_threshold": "115",
+	"scarf_joint_speed": "70",
+	"seam_slope_conditional": "1",
+	"seam_slope_min_length": "10",
+	"seam_slope_start_height": "10%",
+	"seam_slope_steps": "20",
+	"seam_slope_type": "external",
+	"wipe_speed": "70"
 }

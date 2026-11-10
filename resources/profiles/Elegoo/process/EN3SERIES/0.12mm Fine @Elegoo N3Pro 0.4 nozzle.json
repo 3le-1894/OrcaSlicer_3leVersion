@@ -43,5 +43,22 @@
 	"wall_generator": "classic",
 	"wall_maximum_deviation": "0.025",
 	"wall_maximum_resolution": "0.5",
-	"wall_sequence": "inner wall/outer wall"
+	"wall_sequence": "inner wall/outer wall",
+	"brim_object_gap": "0.1",
+	"brim_use_efc_outline": "0",
+	"combine_brims": "0",
+	"elefant_foot_compensation": "0.1",
+	"elefant_foot_layers_density": "100%",
+	"extrusion_rate_smoothing_external_perimeter_only": "0",
+	"max_volumetric_extrusion_rate_slope": "0",
+	"max_volumetric_extrusion_rate_slope_segment_length": "3",
+	"scarf_angle_threshold": "155",
+	"scarf_joint_speed": "100%",
+	"seam_position": "aligned",
+	"seam_slope_inner_walls": "1",
+	"seam_slope_min_length": "0",
+	"seam_slope_start_height": "0",
+	"seam_slope_steps": "10",
+	"seam_slope_type": "none",
+	"wipe_speed": "100%"
 }
