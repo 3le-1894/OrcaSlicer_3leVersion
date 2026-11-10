@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "libslic3r/GCodeWriter.hpp"
+#include "libslic3r/GCodeReader.hpp"
 #include "libslic3r/GCode.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Print.hpp"
@@ -846,4 +847,231 @@ TEST_CASE("Custom G-code motion limits are restored before generated moves", "[G
     REQUIRE(custom_gcode_pos != std::string::npos);
     REQUIRE(gcode.find("M204 S6000 ; adjust acceleration", custom_gcode_pos) != std::string::npos);
     REQUIRE(gcode.find("M205 X8 Y8 ; adjust jerk", custom_gcode_pos) != std::string::npos);
+}
+
+
+static void configure_lift_writer(GCodeWriter &writer)
+{
+    writer.config.z_hop.values = {0.4};
+    writer.config.retract_lift_above.values = {0.0};
+    writer.config.retract_lift_below.values = {0.0};
+    writer.set_extruders({0});
+    writer.set_extruder(0);
+}
+
+// Counts the travels (no E) that move in X or Y while lowering Z: each drags the nozzle down over the print.
+static int count_descending_travels(const std::string &gcode)
+{
+    int         descending_travels = 0;
+    int rises = 0;
+    int descents = 0;
+    GCodeReader reader;
+    reader.parse_buffer(gcode, [&descending_travels, &rises, &descents](GCodeReader &self, const GCodeReader::GCodeLine &line) {
+        rises += line.dist_Z(self) > EPSILON;
+        descents += line.dist_Z(self) < -EPSILON;
+        if (line.travel() && line.dist_Z(self) < -EPSILON && (line.dist_X(self) != 0.f || line.dist_Y(self) != 0.f)) {
+            UNSCOPED_INFO(line.raw());
+            ++descending_travels;
+        }
+    });
+    CHECK(rises > 0);
+    CHECK(descents > 0);
+    return descending_travels;
+}
+
+// Counts the travels made after the nozzle came straight down, before it printed or rose again:
+// the nozzle dropped from its lift short of the destination and crosses the print low. Moves before
+// the first extrusion come down from the start G-code and are not counted.
+static int count_travels_after_descent(const std::string &gcode)
+{
+    int         travels   = 0;
+    bool        printed   = false;
+    bool        descended = false;
+    GCodeReader reader;
+    reader.parse_buffer(gcode, [&travels, &printed, &descended](GCodeReader &self, const GCodeReader::GCodeLine &line) {
+        if (!line.cmd_is("G0") && !line.cmd_is("G1") && !line.cmd_is("G2") && !line.cmd_is("G3"))
+            return;
+        const bool xy = line.dist_X(self) != 0.f || line.dist_Y(self) != 0.f;
+        if (line.has(E) || line.dist_Z(self) > EPSILON) {
+            printed |= xy && line.extruding(self);
+            descended = false;
+        } else if (xy) {
+            if (descended) {
+                UNSCOPED_INFO(line.raw());
+                ++travels;
+            }
+            descended = false;
+        } else if (line.dist_Z(self) < -EPSILON) {
+            descended = printed;
+        }
+    });
+    return travels;
+}
+
+TEST_CASE("A lifted nozzle reaches its target height only after the travel back to the print", "[GCodeWriter][ZHopDestination][Regression]") {
+    // Two filaments on one nozzle with a prime tower: after each tool change the nozzle is
+    // lifted at the tower and travels back to the object.
+    const int         lift        = GENERATE(int(zhtNormal), int(zhtSlope), int(zhtSpiral), int(zhtAuto));
+    const std::string arc_fitting = GENERATE("0", "1");
+    CAPTURE(lift, arc_fitting);
+    DynamicPrintConfig config = Test::multifilament_config(2, {
+        {"filament_self_index", "1,2"},
+        {"filament_extruder_variant", "Direct Drive Standard;Direct Drive Standard"},
+        {"z_hop", "0.4"},
+        {"retract_lift_below", "0"},
+        {"enable_prime_tower", 1},
+        {"wipe_tower_x", "50"},
+        {"wipe_tower_y", "50"},
+        {"skirt_loops", 0},
+        {"brim_type", "no_brim"},
+        // A spiral lift is written as G2/G3 when arc fitting is on.
+        {"enable_arc_fitting", arc_fitting},
+    });
+    config.option<ConfigOptionEnumsGeneric>("z_hop_types", true)->values = {lift};
+    Print print;
+    Model model;
+    print.is_BBL_printer() = true;
+    const std::vector<std::vector<ConfigBase::SetDeserializeItem>> overrides{{{"extruder", "1"}}, {{"extruder", "2"}}};
+    Test::init_print({Test::cube(20), Test::cube(20)}, print, model, config, &overrides);
+
+    CHECK(count_descending_travels(Test::gcode(print)) == 0);
+}
+
+TEST_CASE("A lifted nozzle keeps its height over a detour around a concave part", "[GCodeWriter][ZHopDestination][Regression]") {
+    // A Bambu Lab printer lifts at each layer change, and avoiding crossing walls detours the travel
+    // to the next layer's start around the notch of the L.
+    const int lift = GENERATE(int(zhtNormal), int(zhtSlope), int(zhtSpiral));
+    CAPTURE(lift);
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+        {"z_hop", "0.4"},
+        {"retract_lift_below", "0"},
+        {"retract_when_changing_layer", "1"},
+        {"reduce_crossing_wall", 1},
+        {"seam_position", "random"},
+        {"enable_arc_fitting", "0"},
+        {"skirt_loops", 0},
+        {"brim_type", "no_brim"},
+    });
+    config.option<ConfigOptionEnumsGeneric>("z_hop_types", true)->values = {lift};
+    Print print;
+    Model model;
+    print.is_BBL_printer() = true;
+    Test::init_print({TestMesh::L}, print, model, config);
+
+    const std::string gcode = Test::gcode(print);
+    CHECK(count_descending_travels(gcode) == 0);
+    CHECK(count_travels_after_descent(gcode) == 0);
+}
+
+TEST_CASE("A lifted travel that ends lower descends only at its destination", "[GCodeWriter][ZHopDestination][Regression]") {
+    // Forced: a layer change. Not forced: a destination below the layer, like a scarf seam start.
+    const bool force_z = GENERATE(false, true);
+    CAPTURE(force_z);
+    GCodeWriter writer;
+    configure_lift_writer(writer);
+    // The whole output is parsed, so the reader starts from the position the writer is at.
+    std::string gcode = writer.travel_to_xyz(Vec3d(20.0, 20.0, 5.0));
+    gcode += writer.lazy_lift(LiftType::NormalLift);
+    gcode += writer.travel_to_xyz(Vec3d(30.0, 30.0, 5.0));
+    REQUIRE_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(5.4, EPSILON));
+
+    const double target_z = force_z ? 5.0 : 4.9;
+    gcode += writer.travel_to_xyz(Vec3d(40.0, 40.0, target_z), "", force_z);
+    INFO(gcode);
+    CHECK(count_descending_travels(gcode) == 0);
+    CHECK_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(target_z, EPSILON));
+
+    // Already above the destination, the descent is a single move.
+    writer.lazy_lift(LiftType::NormalLift);
+    writer.travel_to_xyz(Vec3d(50.0, 50.0, target_z));
+    const std::string descent = writer.travel_to_xyz(Vec3d(50.0, 50.0, target_z), "", true);
+    CHECK(std::count(descent.begin(), descent.end(), '\n') == 1);
+    GCodeReader reader;
+    reader.parse_buffer("G1 X50 Y50 Z" + std::to_string(target_z + 0.4) + "\n", [](GCodeReader &, const GCodeReader::GCodeLine &) {});
+    reader.parse_buffer(descent, [&](GCodeReader &self, const GCodeReader::GCodeLine &line) {
+        CHECK_THAT(line.dist_X(self), Catch::Matchers::WithinAbs(0., EPSILON));
+        CHECK_THAT(line.dist_Y(self), Catch::Matchers::WithinAbs(0., EPSILON));
+        CHECK(line.dist_Z(self) < -EPSILON);
+        CHECK_THAT(line.new_Z(self), Catch::Matchers::WithinAbs(target_z, EPSILON));
+    });
+}
+
+TEST_CASE("Lifted travel descends at the destination with plate offsets and lazy lifts", "[GCodeWriter][ZHopDestination][Regression]")
+{
+    const bool pending = GENERATE(false, true);
+    const unsigned int nozzle = GENERATE(0u, 1u);
+    const bool force_z = GENERATE(false, true);
+    const double target_z = GENERATE(5.0, 4.9);
+    CAPTURE(pending, nozzle, force_z, target_z);
+    GCodeWriter writer;
+    configure_lift_writer(writer);
+    writer.set_extruders({0, 1});
+    writer.toolchange(nozzle, nozzle);
+    writer.set_xy_offset(3.0, 4.0);
+    writer.travel_to_xyz(Vec3d(20.0, 20.0, 5.0));
+    std::string moves;
+    if (pending)
+        writer.lazy_lift(LiftType::NormalLift);
+    else
+        moves += writer.eager_lift(LiftType::NormalLift);
+    moves += writer.travel_to_xyz(Vec3d(25.0, 25.0, 5.0));
+    REQUIRE_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(5.4, EPSILON));
+    // A pending lift on the first leg is realized there; intermediate waypoints stay high.
+    if (pending)
+        moves += writer.travel_to_xy(Vec2d(30.0, 25.0));
+    moves += writer.travel_to_xyz(Vec3d(40.0, 40.0, target_z), "", force_z);
+    moves += writer.unlift();
+    GCodeReader reader;
+    bool raised = false;
+    bool high_xy = false;
+    bool descended = false;
+    reader.parse_buffer("G1 X17 Y16 Z5\n" + moves, [&](GCodeReader &self, const GCodeReader::GCodeLine &line) {
+        if (line.dist_Z(self) > EPSILON && line.new_Z(self) > 5.3)
+            raised = true;
+        const bool xy = std::abs(line.dist_X(self)) > EPSILON || std::abs(line.dist_Y(self)) > EPSILON;
+        if (raised && xy && line.new_Z(self) > 5.3)
+            high_xy = true;
+        if (raised && line.dist_Z(self) < -EPSILON) {
+            CHECK_FALSE(xy);
+            CHECK(high_xy);
+            CHECK_THAT(line.new_X(self), Catch::Matchers::WithinAbs(37., EPSILON));
+            CHECK_THAT(line.new_Y(self), Catch::Matchers::WithinAbs(36., EPSILON));
+            descended = true;
+        }
+    });
+    CHECK(raised);
+    CHECK(high_xy);
+    CHECK(descended);
+    CHECK_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(target_z, EPSILON));
+    CHECK_THAT(writer.get_zhop(), Catch::Matchers::WithinAbs(0., EPSILON));
+}
+
+TEST_CASE("Unlifted travel keeps a combined move to a lower scarf start", "[GCodeWriter][ZHopDestination][Regression]")
+{
+    GCodeWriter writer;
+    configure_lift_writer(writer);
+    writer.config.z_hop.values = {0.0};
+    writer.travel_to_xyz(Vec3d(20.0, 20.0, 5.0));
+    CHECK(writer.lazy_lift(LiftType::NormalLift).empty());
+    const std::string move = writer.travel_to_xyz(Vec3d(30.0, 30.0, 4.9));
+    CHECK_THAT(move, Catch::Matchers::StartsWith("G1 X30 Y30 Z4.9"));
+    CHECK(std::count(move.begin(), move.end(), '\n') == 1);
+    CHECK_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(4.9, EPSILON));
+}
+
+TEST_CASE("A pending lift at a coincident destination preserves the current height", "[GCodeWriter][ZHopDestination][Regression]")
+{
+    GCodeWriter writer;
+    configure_lift_writer(writer);
+    writer.travel_to_xyz(Vec3d(20., 20., 5.));
+    writer.lazy_lift(LiftType::NormalLift);
+    const std::string move = writer.travel_to_xyz(Vec3d(20., 20., 5.), "", true);
+    GCodeReader reader;
+    reader.parse_buffer("G1 X20 Y20 Z5\n", [](GCodeReader &, const GCodeReader::GCodeLine &) {});
+    reader.parse_buffer(move, [&](GCodeReader &self, const GCodeReader::GCodeLine &line) {
+        CHECK_THAT(line.new_Z(self), Catch::Matchers::WithinAbs(5., EPSILON));
+    });
+    CHECK_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(5., EPSILON));
+    CHECK_THAT(writer.get_zhop(), Catch::Matchers::WithinAbs(0., EPSILON));
 }

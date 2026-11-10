@@ -941,22 +941,23 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const std::string &co
         this->set_current_position_clear(true);
         return this->travel_to_xy(to_2d(point));
     }
-    else {
-        /*  In all the other cases, we perform an actual XYZ move and cancel
-            the lift. */
-        m_lifted = 0;
-    }
+    // Keep a lifted nozzle above the print until it reaches a lower destination,
+    // including forced layer-height moves. Pure Z descents remain a single move.
+    const bool descend_after_xy = m_lifted > EPSILON && point.z() < m_pos.z() - EPSILON &&
+        this->is_current_position_clear() && (to_2d(point) - to_2d(m_pos)).norm() > EPSILON;
+    m_lifted = 0;
 
     //BBS: take plate offset into consider
     Vec3d point_on_plate = { dest_point(0) - m_x_offset, dest_point(1) - m_y_offset, dest_point(2) };
     std::string out_string;
     GCodeG1Formatter w;
-    if (!this->is_current_position_clear())
+    if (!this->is_current_position_clear() || descend_after_xy)
     {
-        //force to move xy first then z after filament change
+        // Move XY first after a filament change or when descending from a lift.
         w.emit_xy(Vec2d(point_on_plate.x(), point_on_plate.y()));
         w.emit_f(this->config.travel_speed.get_at(m_cached_extruder_idx) * 60.0);
         w.emit_comment(GCodeWriter::full_gcode_comment, comment);
+        m_pos = Vec3d(dest_point.x(), dest_point.y(), m_pos.z());
         out_string = w.string() + _travel_to_z(point_on_plate.z(), comment);
     } else {
         GCodeG1Formatter w;

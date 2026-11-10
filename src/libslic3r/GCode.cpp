@@ -9056,31 +9056,21 @@ std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string
                 gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[i]), comment);
             }
         } else {
-            if (travel.size() == 2) {
-                // No extra movements emitted by avoid_crossing_perimeters, simply move to the end point with z change
-                const auto& dest2d = this->point_to_gcode(travel.points.back());
-                Vec3d dest3d(dest2d(0), dest2d(1), z == DBL_MAX ? m_nominal_z : z);
-                gcode += m_writer.travel_to_xyz(dest3d, comment, m_need_change_layer_lift_z);
-                m_need_change_layer_lift_z = false;
-            } else {
-                // Extra movements emitted by avoid_crossing_perimeters, lift the z to normal height at the beginning, then apply the z
-                // ratio at the last point
-                for (size_t i = 1; i < travel.size(); ++i) {
-                    if (i == 1) {
-                        // Lift to normal z at beginning
-                        Vec2d dest2d = this->point_to_gcode(travel.points[i]);
-                        Vec3d dest3d(dest2d(0), dest2d(1), m_nominal_z);
-                        gcode += m_writer.travel_to_xyz(dest3d, comment, m_need_change_layer_lift_z);
-                        m_need_change_layer_lift_z = false;
-                    } else if (z != DBL_MAX && i == travel.size() - 1) {
-                        // Apply z_ratio for the very last point
-                        Vec2d dest2d = this->point_to_gcode(travel.points[i]);
-                        Vec3d dest3d(dest2d(0), dest2d(1), z);
-                        gcode += m_writer.travel_to_xyz(dest3d, comment);
-                    } else {
-                        // For all points in between, no z change
-                        gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[i]), comment);
-                    }
+            const double target_z = z == DBL_MAX ? m_nominal_z : z;
+            const bool stay_lifted = m_writer.get_zhop() > EPSILON && m_writer.get_position().z() > target_z + EPSILON;
+            // A pending lazy lift is realized on the first leg. An existing lift
+            // stays over every waypoint; set the target height only at the end.
+            const bool layer_z_first = travel.size() > 2 && !stay_lifted;
+            for (size_t i = 1; i < travel.size(); ++i) {
+                const Vec2d dest2d = this->point_to_gcode(travel.points[i]);
+                if (i == 1 && layer_z_first) {
+                    gcode += m_writer.travel_to_xyz(Vec3d(dest2d.x(), dest2d.y(), m_nominal_z), comment, m_need_change_layer_lift_z);
+                    m_need_change_layer_lift_z = false;
+                } else if (i == travel.size() - 1 && (z != DBL_MAX || !layer_z_first)) {
+                    gcode += m_writer.travel_to_xyz(Vec3d(dest2d.x(), dest2d.y(), target_z), comment, m_need_change_layer_lift_z);
+                    m_need_change_layer_lift_z = false;
+                } else {
+                    gcode += m_writer.travel_to_xy(dest2d, comment);
                 }
             }
         }
