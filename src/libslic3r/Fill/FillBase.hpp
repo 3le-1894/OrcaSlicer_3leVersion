@@ -242,7 +242,10 @@ public:
    // group prints as one path. Without can_reverse only the end of one polyline joins the start of another.
    // Every new connector must be covered by permitted_region (including its holes).
    // Without a supplied region, leave the paths unchanged rather than assume a join is safe.
-   void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse, const ExPolygons &permitted_region = {});
+   enum class InfillJoinMode { Nearby, Coincident };
+   // Coincident rejoins clipped rings without adding geometry; closed islands stay independent.
+   void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse,
+                        const ExPolygons &permitted_region = {}, InfillJoinMode mode = InfillJoinMode::Nearby);
 } // namespace Slic3r
 
 #endif // slic3r_FillBase_hpp_

@@ -6,8 +6,10 @@
 #include <numeric>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
+#include "libslic3r/AABBTreeLines.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Fill/Fill.hpp"
 #include "libslic3r/Flow.hpp"
@@ -1266,4 +1268,292 @@ TEST_CASE("Sparse infill does not fall back to joins when its inset is empty", "
     const Polylines printed = prescribed_sparse_extrusions(fill, region);
     CHECK(printed.size() == 2);
     CHECK(diff_pl(printed, region).empty());
+}
+
+
+namespace {
+bool ring_follows_boundary(const Polyline &path, const Lines &boundary)
+{
+    // These fixtures rotate clipped integer geometry out of the fill frame.
+    // Two coordinate quantizations contribute at most 2*sqrt(2) units; four
+    // units bound that error, independently of the .01 mm open-end proximity.
+    constexpr double rounding_squared = 4. * 4.;
+    for (const Line &line : path.lines()) {
+        if (line.length() <= scale_(0.1))
+            continue;
+        for (const Line &edge : boundary)
+            if (Line::distance_to_squared(line.a, edge.a, edge.b) <= rounding_squared &&
+                Line::distance_to_squared(line.b, edge.a, edge.b) <= rounding_squared)
+                return true; // The whole segment lies in this finite edge's rounding envelope.
+    }
+    return false;
+}
+}
+
+TEST_CASE("Clipped infill rings keep their ends on the boundary", "[Fill][RingContinuity][Regression]")
+{
+    const auto [pattern, optimized] = GENERATE(table<InfillPattern, bool>({
+        {ipTpmsD, false}, {ipTpmsFK, false}, {ipGyroid, false}, {ipGyroid, true}}));
+    const int multiline = GENERATE(1, 2);
+    const float density = GENERATE(0.1f, 0.3f);
+    const double angle = GENERATE(0., M_PI / 4.);
+    const bool with_hole = GENERATE(false, true);
+    CAPTURE(pattern, optimized, multiline, density, angle, with_hole);
+    const double spacing = 0.45;
+    ExPolygon region(Points{Point::new_scale(0., 0.), Point::new_scale(60., 0.),
+                            Point::new_scale(60., 60.), Point::new_scale(0., 60.)});
+    if (with_hole) {
+        Polygon hole(Points{Point::new_scale(20., 20.), Point::new_scale(40., 20.),
+                            Point::new_scale(40., 40.), Point::new_scale(20., 40.)});
+        hole.make_clockwise();
+        region.holes.push_back(std::move(hole));
+    }
+    const ExPolygons inset = offset_ex(region, -float(scale_(0.5 * spacing)));
+    const Lines boundary = to_lines(inset);
+    const AABBTreeLines::LinesDistancer<Line> walls(boundary);
+    auto on_wall = [&walls](const Point &point) { return walls.distance_from_lines<false>(point) < scale_(0.01); };
+    for (double z : {5.1, 12.3, 20.1, 25.3, 28.7, 34.7, 40.1, 47.9, 54.9}) {
+        CAPTURE(z);
+        std::unique_ptr<Fill> filler(Fill::new_from_type(pattern));
+        filler->spacing = spacing;
+        filler->angle = float(angle);
+        filler->z = z;
+        FillParams params;
+        params.pattern = pattern;
+        params.density = density;
+        params.multiline = multiline;
+        params.gyroid_optimized = optimized;
+        params.layer_height = 0.2;
+        params.dont_adjust = true;
+        Surface surface(stInternal, region);
+        const Polylines paths = filler->fill_surface(&surface, params);
+        REQUIRE_FALSE(paths.empty());
+        for (const Polyline &path : paths) {
+            REQUIRE(path.size() >= 2);
+            if (path.first_point() == path.last_point()) {
+                CHECK(path.size() > 3);
+                if (!on_wall(path.first_point())) {
+                    CHECK_FALSE(ring_follows_boundary(path, boundary));
+                }
+            } else {
+                CHECK(on_wall(path.first_point()));
+                CHECK(on_wall(path.last_point()));
+            }
+        }
+    }
+}
+
+
+namespace {
+// Exact undirected segment multiset: catches added, lost or duplicated nonzero geometry.
+auto ring_segments(const Polylines &paths)
+{
+    std::vector<std::tuple<coord_t, coord_t, coord_t, coord_t>> segments;
+    for (const Polyline &path : paths)
+        for (const Line &line : path.lines()) {
+            Point a = line.a, b = line.b;
+            if (a == b)
+                continue;
+            if (std::make_pair(a.x(), a.y()) > std::make_pair(b.x(), b.y()))
+                std::swap(a, b);
+            segments.emplace_back(a.x(), a.y(), b.x(), b.y());
+        }
+    std::sort(segments.begin(), segments.end());
+    return segments;
+}
+
+auto ring_outside_segments(const Polylines &paths, const ExPolygons &region)
+{
+    // Open clipping classifies boundary-coincident edges using path context.
+    // Feed the same sorted, directed two-point paths when comparing geometry.
+    Polylines canonical;
+    for (const auto &[ax, ay, bx, by] : ring_segments(paths))
+        canonical.emplace_back(Point(ax, ay), Point(bx, by));
+    return ring_segments(diff_pl(canonical, region));
+}
+}
+
+TEST_CASE("Coincident infill reassembly preserves every segment and closed island", "[Fill][RingContinuity][Regression]")
+{
+    const bool reverse = GENERATE(false, true);
+    const int count = GENERATE(2, 3);
+    CAPTURE(reverse, count);
+    const ExPolygons region = infill_join_test_region();
+    Polylines paths{Polyline(Point::new_scale(0., 0.), Point::new_scale(1., 0.)),
+                    Polyline(Point::new_scale(1., 0.), Point::new_scale(2., 0.))};
+    if (count == 3)
+        paths.emplace_back(Point::new_scale(2., 0.), Point::new_scale(3., 0.));
+    if (reverse)
+        paths[1].reverse();
+    // A closed island touching a seam must not become part of the open chain.
+    const Polyline island(Points{Point::new_scale(1., 0.), Point::new_scale(1., 1.),
+                                  Point::new_scale(2., 1.), Point::new_scale(1., 0.)});
+    paths.push_back(island);
+    const auto before = ring_segments(paths);
+    join_close_ends(paths, SCALED_EPSILON, true, region, InfillJoinMode::Coincident);
+    CHECK(paths.size() == 2);
+    CHECK(ring_segments(paths) == before);
+    CHECK(diff_pl(paths, region).empty());
+    CHECK(std::count_if(paths.begin(), paths.end(), [&](const Polyline &path) { return path.points == island.points; }) == 1);
+}
+
+TEST_CASE("Coincident infill reassembly refuses gaps and missing permitted geometry", "[Fill][RingContinuity][InfillContainment][Regression]")
+{
+    const int scenario = GENERATE(0, 1, 2, 3, 4);
+    CAPTURE(scenario);
+    ExPolygons region = infill_join_test_region();
+    Polylines paths{Polyline(Point::new_scale(0., 0.), Point::new_scale(1., 0.)),
+                    Polyline(Point::new_scale(1., 0.), Point::new_scale(2., 0.))};
+    if (scenario == 0)
+        paths[1].points.front().x() += 1; // One integer unit, strictly below SCALED_EPSILON.
+    else if (scenario == 1)
+        region.clear();
+    else if (scenario == 2)
+        region.front().translate(Point::new_scale(100., 0.));
+    else if (scenario == 3)
+        paths.resize(1);
+    else
+        paths.clear();
+    const auto before = ring_segments(paths);
+    const size_t count = paths.size();
+    join_close_ends(paths, SCALED_EPSILON, true, region, InfillJoinMode::Coincident);
+    CHECK(paths.size() == count);
+    CHECK(ring_segments(paths) == before);
+}
+
+TEST_CASE("Coincident infill reassembly leaves a component open", "[Fill][RingContinuity][Regression]")
+{
+    Polylines paths{Polyline(Point::new_scale(0., 0.), Point::new_scale(1., 0.)),
+                    Polyline(Points{Point::new_scale(1., 0.), Point::new_scale(1., 1.), Point::new_scale(0., 0.)})};
+    const auto before = ring_segments(paths);
+    join_close_ends(paths, SCALED_EPSILON, true, infill_join_test_region(), InfillJoinMode::Coincident);
+    REQUIRE(paths.size() == 1);
+    CHECK(ring_segments(paths) == before);
+    // Concatenation may naturally reconstruct an already closed outline. The helper
+    // must not add a second join to close the union-find component.
+    CHECK(paths.front().size() == 4);
+}
+
+
+TEST_CASE("Reassembling narrow island infill adds no geometry at any overlap", "[Fill][RingContinuity][InfillContainment][Regression]")
+{
+    const auto [pattern, optimized] = GENERATE(table<InfillPattern, bool>({
+        {ipTpmsD, false}, {ipTpmsFK, false}, {ipGyroid, false}, {ipGyroid, true}}));
+    const int multiline = GENERATE(1, 2);
+    const double overlap = GENERATE(0., 0.2, 0.6);
+    CAPTURE(pattern, optimized, multiline, overlap);
+    // Negative coordinates and a narrow neck that separates the lobes at the
+    // fill inset. Each offset component is still handled independently.
+    ExPolygon region(Points{Point::new_scale(-20., -10.), Point::new_scale(-0.1, -10.),
+        Point::new_scale(-0.1, -0.1), Point::new_scale(0.1, -0.1), Point::new_scale(0.1, -10.),
+        Point::new_scale(20., -10.), Point::new_scale(20., 10.), Point::new_scale(0.1, 10.),
+        Point::new_scale(0.1, 0.1), Point::new_scale(-0.1, 0.1), Point::new_scale(-0.1, 10.),
+        Point::new_scale(-20., 10.)});
+    Polygon hole(Points{Point::new_scale(-10.00001, -2.), Point::new_scale(-9.99999, -2.),
+                         Point::new_scale(-9.99999, 2.), Point::new_scale(-10.00001, 2.)});
+    hole.make_clockwise();
+    region.holes.push_back(std::move(hole));
+    const double spacing = 0.45;
+    std::unique_ptr<Fill> filler(Fill::new_from_type(pattern));
+    filler->spacing = spacing;
+    filler->overlap = overlap;
+    filler->angle = float(M_PI / 4.);
+    filler->z = 12.3;
+    FillParams params;
+    params.pattern = pattern;
+    params.density = 0.3f;
+    params.multiline = multiline;
+    params.gyroid_optimized = optimized;
+    params.layer_height = 0.2;
+    params.dont_adjust = true;
+    Surface surface(stInternal, region);
+    const Polylines generated = filler->fill_surface(&surface, params);
+    REQUIRE_FALSE(generated.empty());
+    Polylines pieces;
+    for (const Polyline &path : generated) {
+        if (path.size() < 4) {
+            pieces.push_back(path);
+            continue;
+        }
+        const size_t middle = path.size() / 2;
+        pieces.emplace_back(Points(path.points.begin(), path.points.begin() + middle + 1));
+        pieces.emplace_back(Points(path.points.begin() + middle, path.points.end()));
+    }
+    const ExPolygons permitted = offset_ex(region, float(scale_(overlap - 0.5 * spacing)));
+    const auto outside_before = ring_outside_segments(pieces, permitted);
+    const auto segments_before = ring_segments(pieces);
+    join_close_ends(pieces, SCALED_EPSILON, true, permitted, InfillJoinMode::Coincident);
+    CHECK(ring_segments(pieces) == segments_before);
+    CHECK(ring_outside_segments(pieces, permitted) == outside_before);
+    // Especially at positive overlap, an existing anchor is not evidence that
+    // a new connector is allowed through the original surface's narrow hole.
+    CHECK(ring_outside_segments(pieces, ExPolygons{region}) == ring_outside_segments(generated, ExPolygons{region}));
+}
+
+
+TEST_CASE("Ring continuity distinguishes boundary anchors from nearby islands", "[Fill][RingContinuity][Regression]")
+{
+    const ExPolygons inset{ExPolygon(Points{Point::new_scale(.225,.225), Point::new_scale(59.775,.225),
+                                              Point::new_scale(59.775,59.775), Point::new_scale(.225,59.775)})};
+    const Lines boundary = to_lines(inset);
+    // A cut ring joined around the bottom wall must still be rejected.
+    const Polyline anchored(Points{Point::new_scale(10.,10.), Point::new_scale(10.,.225),
+                                    Point::new_scale(20.,.225), Point::new_scale(20.,10.), Point::new_scale(10.,10.)});
+    CHECK(ring_follows_boundary(anchored, boundary));
+    // Exact pre-clipping FK multiline island from the two residual R1 cases.
+    Polyline island(Points{
+        Point(18203755, 20141892),
+        Point(17666067, 20360552),
+        Point(17300922, 20708309),
+        Point(17150082, 20973117),
+        Point(17020349, 21409163),
+        Point(16963716, 22164278),
+        Point(17003656, 22527374),
+        Point(17097375, 22887833),
+        Point(17276428, 23238916),
+        Point(17484613, 23466929),
+        Point(17823408, 23663430),
+        Point(18559027, 23817910),
+        Point(19304838, 23776890),
+        Point(19658672, 23677817),
+        Point(20009763, 23495249),
+        Point(20290717, 23228000),
+        Point(20485661, 22885994),
+        Point(20651913, 22147093),
+        Point(20625719, 21398694),
+        Point(20540372, 21043079),
+        Point(20379357, 20700493),
+        Point(20012173, 20340237),
+        Point(19668795, 20182283),
+        Point(19313477, 20100560),
+        Point(18557984, 20081673),
+        Point(18203755, 20141892)});
+    island.rotate(float(-M_PI / 4.));
+    REQUIRE(island.first_point() == island.last_point());
+    CHECK_FALSE(ring_follows_boundary(island, boundary));
+    const AABBTreeLines::LinesDistancer<Line> walls(boundary);
+    bool old_wall_run = false;
+    for (const Line &line : island.lines())
+        if (line.length() > scale_(.1) && walls.distance_from_lines<false>(line.a) < scale_(.01) &&
+            walls.distance_from_lines<false>(line.b) < scale_(.01))
+            old_wall_run = true;
+    CHECK(old_wall_run); // The previous heuristic misclassified this genuine island.
+    CHECK(diff_pl(Polylines{island}, inset).empty());
+}
+
+TEST_CASE("Outside segment comparisons are independent of path grouping", "[Fill][RingContinuity][Regression]")
+{
+    const ExPolygons square{ExPolygon(Points{Point::new_scale(0.,0.), Point::new_scale(2.,0.),
+                                               Point::new_scale(2.,2.), Point::new_scale(0.,2.)})};
+    const Point a=Point::new_scale(-1.,0.), b=Point::new_scale(1.,0.), c=Point::new_scale(-1.,1.);
+    const Polylines joined{Polyline(Points{a,b,c})};
+    const Polylines split{Polyline(a,b),Polyline(b,c)};
+    CHECK(ring_segments(joined) == ring_segments(split));
+    // Boundary edge classification depends on neighboring segments of the open path.
+    CHECK(ring_segments(diff_pl(joined,square)) != ring_segments(diff_pl(split,square)));
+    CHECK(ring_outside_segments(joined,square) == ring_outside_segments(split,square));
+    Polylines changed = split;
+    changed.emplace_back(Point::new_scale(-1.,-1.),Point::new_scale(3.,-1.));
+    CHECK(ring_segments(changed) != ring_segments(split));
+    CHECK(ring_outside_segments(changed,square) != ring_outside_segments(split,square));
 }

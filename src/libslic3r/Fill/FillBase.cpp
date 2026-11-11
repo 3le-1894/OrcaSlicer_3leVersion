@@ -2923,7 +2923,7 @@ void multiline_fill(Polylines& polylines, const FillParams& params, float spacin
     polylines = std::move(all_polylines);
 }
 
-void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse, const ExPolygons &permitted_region)
+void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse, const ExPolygons &permitted_region, InfillJoinMode mode)
 {
     const size_t n = polylines.size();
     if (n < 2 || max_gap <= 0. || permitted_region.empty())
@@ -2940,7 +2940,8 @@ void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse, con
     auto key     = [](const Vec2i64 &c) { return (uint64_t(c.x()) << 32) ^ uint64_t(uint32_t(c.y())); };
     std::unordered_map<uint64_t, std::vector<size_t>> grid;
     for (size_t e = 0; e < 2 * n; ++ e)
-        if (polylines[e >> 1].size() >= 2)
+        if (polylines[e >> 1].size() >= 2 &&
+            (mode != InfillJoinMode::Coincident || polylines[e >> 1].first_point() != polylines[e >> 1].last_point()))
             grid[key(cell_of(end_point(e)))].push_back(e);
 
     // The end of a polyline that comes last along its overall direction, taken along the dominant axis.
@@ -2962,7 +2963,8 @@ void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse, con
                     for (size_t a : ends)
                         for (size_t b : it->second)
                             if (a < b && (a >> 1) != (b >> 1) && (can_reverse || (a & 1) != (b & 1)))
-                                if (const double d = (end_point(a) - end_point(b)).cast<double>().norm(); d <= max_gap)
+                                if (const double d = (end_point(a) - end_point(b)).cast<double>().norm(); d <= max_gap &&
+                                    (mode != InfillJoinMode::Coincident || end_point(a) == end_point(b)))
                                     gaps.emplace_back(d > SCALED_EPSILON, d > SCALED_EPSILON && (trailing(a) || trailing(b)), d, a, b);
     }
     if (gaps.empty())
@@ -3016,6 +3018,9 @@ void join_close_ends(Polylines &polylines, double max_gap, bool can_reverse, con
         return false;
     };
     auto contained = [&](size_t a, size_t b) {
+        if (mode == InfillJoinMode::Coincident)
+            return std::any_of(permitted_region.begin(), permitted_region.end(),
+                               [&](const ExPolygon &region) { return region.contains(end_point(a)); });
         // Clipper may classify an open path on a polygon edge as outside.
         // Accept those pieces only when boundary edges cover their full length,
         // using exact collinearity instead of dilating the polygon (and holes).

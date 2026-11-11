@@ -350,6 +350,9 @@ void FillGyroid::_fill_surface_single(
     multiline_fill(polylines, params, spacing);
 
 	polylines = intersection_pl(std::move(polylines), expolygon);
+    // Restore the pieces cut at a ring's arbitrary start before pruning or anchoring.
+    // Exact integer endpoints add no connector across holes or the conservative inset.
+    join_close_ends(polylines, SCALED_EPSILON, true, ExPolygons{expolygon}, InfillJoinMode::Coincident);
 
     if (! polylines.empty()) {
 		// Remove very small bits, but be careful to not remove infill lines connecting thin walls!
