@@ -1278,6 +1278,36 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 
     //BBS: add more logs
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(", Line %1%: enter")%__LINE__;
+    // Project import/fixture producers must establish legacy ownership before
+    // apply. Do not repair explicit invalid ids into filament 1 during caching.
+    const auto *owners = new_full_config.option<ConfigOptionInts>("filament_self_index");
+    const auto *variants = new_full_config.option<ConfigOptionStrings>("filament_extruder_variant");
+    const auto *diameters = new_full_config.option<ConfigOptionFloats>("filament_diameter");
+    // Match the existing project-import contract only for truly absent owners
+    // and an unambiguous one-column-per-filament table. Explicit short/invalid
+    // owner arrays, or a differently sized table, must not be repaired.
+    if (!owners && variants && diameters && !variants->empty() && variants->size() == diameters->size()) {
+        auto *legacy_owners = new_full_config.option<ConfigOptionInts>("filament_self_index", true);
+        legacy_owners->values.resize(diameters->size());
+        for (size_t i = 0; i < diameters->size(); ++i)
+            legacy_owners->values[i] = int(i + 1);
+        owners = legacy_owners;
+    }
+    if (!owners || !variants || !diameters || variants->empty() || owners->size() != variants->size() ||
+        std::any_of(owners->values.begin(), owners->values.end(), [diameters](int id) { return id <= 0 || size_t(id) > diameters->size(); }))
+        throw SlicingError("Invalid filament variant ownership metadata. Re-import the project or select compatible filament presets.");
+    // Expand existing per-filament/scalar values through the validated owner map
+    // before a producer gathers variant columns. Already-expanded values stay intact.
+    normalize_filament_values_to_variants(new_full_config);
+    // One value is an explicit broadcast, including one-column-per-filament
+    // tables where the legacy normalizer otherwise has nothing to expand.
+    for (const std::string &key : filament_options_with_variant) {
+        auto *option = dynamic_cast<ConfigOptionVectorBase *>(new_full_config.option(key));
+        if (option && option->size() == 1 && variants->size() > 1) {
+            std::unique_ptr<ConfigOption> scalar(option->clone());
+            option->resize(variants->size(), scalar.get());
+        }
+    }
     // Normalize the config.
 	new_full_config.option("print_settings_id",            true);
 	new_full_config.option("filament_settings_id",         true);

@@ -1,4 +1,5 @@
 #include "PrintConfig.hpp"
+#include "Exception.hpp"
 #include "PrintConfigConstants.hpp"
 #include "ClipperUtils.hpp"
 #include "Config.hpp"
@@ -683,6 +684,37 @@ int get_config_index_base(NozzleVolumeType volume_type, ExtruderType extruder_ty
         if (extruder_variant == variant_list[index] && variant_ids_1based[index] == variant_id_1based) { return index; }
     }
     return 0;
+}
+
+int resolve_filament_variant_index(NozzleVolumeType volume_type, ExtruderType extruder_type, int filament_id_1based,
+    const std::vector<std::string>& variants, const std::vector<int>& owners)
+{
+    const auto invalid = [&]() {
+        return SlicingError(Slic3r::format("Cannot resolve compatible nozzle settings for filament %d. Check the filament preset variants and physical nozzle mapping.", filament_id_1based));
+    };
+    if (filament_id_1based <= 0 || variants.empty() || variants.size() != owners.size() ||
+        std::any_of(owners.begin(), owners.end(), [](int id) { return id <= 0; }) ||
+        extruder_type < etDirectDrive || extruder_type > etMaxExtruderType ||
+        volume_type < nvtStandard || volume_type > nvtMaxNozzleVolumeType)
+        throw invalid();
+    const std::string exact = get_extruder_variant_string(extruder_type, volume_type == nvtHybrid ? nvtStandard : volume_type);
+    const std::string standard = get_extruder_variant_string(extruder_type, nvtStandard);
+    const std::string high_flow = get_extruder_variant_string(extruder_type, nvtHighFlow);
+    const std::string tpu_high_flow = get_extruder_variant_string(extruder_type, nvtTPUHighFlow);
+    int standard_index = -1, concrete_index = -1;
+    for (size_t i = 0; i < variants.size(); ++i) {
+        if (owners[i] != filament_id_1based)
+            continue;
+        if (variants[i] == exact)
+            return int(i);
+        if (standard_index < 0 && variants[i] == standard)
+            standard_index = int(i);
+        if (concrete_index < 0 && (variants[i] == standard || variants[i] == high_flow || variants[i] == tpu_high_flow))
+            concrete_index = int(i);
+    }
+    if (standard_index >= 0) return standard_index;
+    if (concrete_index >= 0) return concrete_index;
+    throw invalid();
 }
 
 std::string get_nozzle_volume_type_string(NozzleVolumeType nozzle_volume_type)
@@ -11146,23 +11178,11 @@ void DynamicPrintConfig::update_values_to_printer_extruders_for_multiple_filamen
                 nozzle_volume_type = (NozzleVolumeType)(filament_volume_maps[f_index]);
             }
 
-            //variant index
-            variant_index[f_index] = get_index_for_extruder(f_index+1, id_name, extruder_type, nozzle_volume_type, variant_name);
-            if (variant_index[f_index] < 0) {
-                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << boost::format(", Line %1%: could not found extruder_type %2%, nozzle_volume_type %3%, filament_index %4%, extruder index %5%")
-                    %__LINE__ %s_keys_names_ExtruderType[extruder_type] % s_keys_names_NozzleVolumeType[nozzle_volume_type] % (f_index+1) %filament_maps[f_index];
-                assert(false);
-                //for some updates happens in a invalid state(caused by popup window)
-                //we need to avoid crash
-                variant_index[f_index] = 0;
-                if (opt_ids) {
-                    for (int i = 0; i < opt_ids->values.size(); i++)
-                        if (opt_ids->values[i] == (f_index+1)) {
-                            variant_index[f_index] = i;
-                            break;
-                        }
-                }
-            }
+            const auto *variants = this->option<ConfigOptionStrings>(variant_name);
+            if (!variants || !opt_ids)
+                throw SlicingError("Missing filament variant ownership metadata.");
+            variant_index[f_index] = resolve_filament_variant_index(nozzle_volume_type, extruder_type, f_index + 1,
+                                                                   variants->values, opt_ids->values);
         }
 
         const ConfigDef       *config_def     = this->def();
@@ -11407,22 +11427,11 @@ void DynamicPrintConfig::update_filament_config_values_for_multiple_extruders(Dy
     }
 
     auto resolve_slot = [&](int f_index, ExtruderType extruder_type, NozzleVolumeType nozzle_volume_type, int extruder_id_1based) {
-        int param_index = get_index_for_extruder(f_index + 1, id_name, extruder_type, nozzle_volume_type, variant_name);
-        if (param_index < 0) {
-            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << boost::format(", Line %1%: could not found extruder_type %2%, nozzle_volume_type %3%, filament_index %4%, extruder index %5%")
-                %__LINE__ %s_keys_names_ExtruderType[extruder_type] % s_keys_names_NozzleVolumeType[nozzle_volume_type] % (f_index+1) %extruder_id_1based;
-            assert(false);
-            //for some updates happens in a invalid state(caused by popup window)
-            //we need to avoid crash
-            param_index = 0;
-            if (opt_ids) {
-                for (int i = 0; i < opt_ids->values.size(); i++)
-                    if (opt_ids->values[i] == (f_index + 1)) {
-                        param_index = i;
-                        break;
-                    }
-            }
-        }
+        const auto *variants = this->option<ConfigOptionStrings>(variant_name);
+        if (!variants || !opt_ids)
+            throw SlicingError("Missing filament variant ownership metadata.");
+        const int param_index = resolve_filament_variant_index(nozzle_volume_type, extruder_type, f_index + 1,
+                                                               variants->values, opt_ids->values);
         slot_param_indices.push_back(param_index);
         if (slot_machine_indices) {
             // Orca: key each output slot to the machine slot of its own variant (the same

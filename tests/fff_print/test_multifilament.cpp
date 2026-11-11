@@ -2,6 +2,7 @@
 
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "libslic3r/GCodeReader.hpp"
+#include "libslic3r/MultiNozzleUtils.hpp"
 
 #include "test_helpers.hpp"
 #include "test_utils.hpp"
@@ -441,9 +442,11 @@ TEST_CASE("Toolchange temperature wait moves to the wipe tower when enabled", "[
         const std::string gcode = slice_with_object_overrides(
             { cube(20), cube(20) },
             multifilament_config(2, {
-                { "nozzle_diameter",                "0.4,0.4" },
+                // These temperature-order fixtures require one filament on each physical tool.
+            { "filament_map", "1,2" }, { "filament_map_mode", "Manual" },
+            { "nozzle_diameter",                "0.4,0.4" },
                 { "printer_extruder_id",            "1,2" },
-                { "printer_extruder_variant",       "Direct Drive Standard,Direct Drive Standard" },
+                { "printer_extruder_variant",       "Direct Drive Standard;Direct Drive Standard" },
                 { "extruder_printable_height",      "0,0" },
                 { "single_extruder_multi_material", 0 },
                 { "enable_prime_tower",             1 },
@@ -728,9 +731,11 @@ TEST_CASE("Toolchange temperature commands are unchanged when the wipe tower wai
     const std::string gcode = slice_with_object_overrides(
         { make_cube(20., 20., 5.), make_cube(20., 20., 5.) },
         multifilament_config(2, {
+            // These temperature-order fixtures require one filament on each physical tool.
+            { "filament_map", "1,2" }, { "filament_map_mode", "Manual" },
             { "nozzle_diameter",                        "0.4,0.4" },
             { "printer_extruder_id",                    "1,2" },
-            { "printer_extruder_variant",               "Direct Drive Standard,Direct Drive Standard" },
+            { "printer_extruder_variant",               "Direct Drive Standard;Direct Drive Standard" },
             { "extruder_printable_height",              "0,0" },
             { "single_extruder_multi_material",         0 },
             { "single_extruder_multi_material_priming", 1 }, // reaches toolchange_Change's priming path
@@ -861,3 +866,268 @@ TEST_CASE("Multi-extruder slice stays in bounds with a short max_layer_height", 
     REQUIRE_FALSE(print.objects().front()->layers().empty());
 }
 
+
+
+// Expose the real production overload to exercise malformed/missing inputs without
+// bypassing Print's configured physical extruder context or duplicating lookup logic.
+class FilamentLookupPrint : public Print {
+public:
+    using Print::get_config_index;
+    using Print::FilamentIndexMap;
+};
+
+TEST_CASE("Filament lookup keeps exact and fallback columns owned by that filament", "[MultiFilament][PAFallback][Regression]")
+{
+    const ExtruderType drive = GENERATE(etDirectDrive, etBowden);
+    const NozzleVolumeType volume = GENERATE(nvtStandard, nvtHighFlow);
+    FilamentLookupPrint print;
+    Model model;
+    auto config = multifilament_config(2, {{"filament_map", "1,1"}});
+    config.option<ConfigOptionEnumsGeneric>("extruder_type", true)->values = {drive};
+    config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type", true)->values = {volume};
+    Test::init_print({cube(2)}, print, model, config);
+    const std::string standard = get_extruder_variant_string(drive, nvtStandard);
+    const std::string high = get_extruder_variant_string(drive, nvtHighFlow);
+    const std::vector<int> owners{1, 1, 2, 2};
+    const std::vector<std::string> variants{standard, high, standard, high};
+    FilamentLookupPrint::FilamentIndexMap cache;
+    const int exact = print.get_config_index(1, -1, variants, owners, cache);
+    CHECK(exact == (volume == nvtStandard ? 2 : 3));
+    cache.clear();
+    const int fallback = print.get_config_index(1, -1, {standard, high, standard}, {1, 1, 2}, cache);
+    CHECK(fallback == 2);
+    CHECK(std::vector<int>{1, 1, 2}[fallback] == 2);
+    cache.clear();
+    CHECK(print.get_config_index(1, -1, {standard, high}, {1, 2}, cache) == 1);
+}
+
+TEST_CASE("Filament lookup rejects missing owners and incompatible fallback contexts", "[MultiFilament][PAFallback][Regression]")
+{
+    FilamentLookupPrint print;
+    Model model;
+    auto config = multifilament_config(2, {{"filament_map", "1,1"}});
+    Test::init_print({cube(2)}, print, model, config);
+    FilamentLookupPrint::FilamentIndexMap cache;
+    CHECK_THROWS_AS(print.get_config_index(1, -1, {"Direct Drive Standard"}, {1}, cache), SlicingError);
+    CHECK_THROWS_AS(print.get_config_index(1, -1, {"Bowden Standard"}, {2}, cache), SlicingError);
+    CHECK_THROWS_AS(print.get_config_index(1, -1, {""}, {2}, cache), SlicingError);
+    CHECK_THROWS_AS(print.get_config_index(1, -1, {}, {}, cache), SlicingError);
+    CHECK_THROWS_AS(print.get_config_index(1, -1, {"Direct Drive Standard"}, {}, cache), SlicingError);
+    CHECK_THROWS_AS(print.get_config_index(-1, -1, {"Direct Drive Standard"}, {1}, cache), SlicingError);
+    FilamentLookupPrint unconfigured;
+    CHECK_THROWS_AS(unconfigured.get_config_index(1, -1, {"Direct Drive Standard"}, {2}, cache), SlicingError);
+    print.set_nozzle_group_result(std::make_shared<MultiNozzleUtils::LayeredNozzleGroupResult>());
+    CHECK_THROWS_AS(print.get_filament_config_indx(1, 0), SlicingError);
+}
+
+
+TEST_CASE("Missing nozzle variants keep ordinary adaptive and start-code PA on their filament", "[MultiFilament][PAFallback][Regression]")
+{
+    const ExtruderType drive = GENERATE(etDirectDrive, etBowden);
+    const bool adaptive = GENERATE(false, true);
+    CAPTURE(drive, adaptive);
+    const std::string standard = get_extruder_variant_string(drive, nvtStandard);
+    const std::string high = get_extruder_variant_string(drive, nvtHighFlow);
+    auto config = multifilament_config(2, {
+        {"gcode_flavor", "klipper"}, {"filament_map", "1,1"},
+        {"extruder_variant_list", standard + "," + high},
+        {"printer_extruder_id", "1,1"}, {"printer_extruder_variant", standard + ";" + high},
+        {"filament_extruder_variant", standard + ";" + high + ";" + standard},
+        {"filament_self_index", "1,1,2"},
+        {"enable_pressure_advance", "1,1,1"}, {"pressure_advance", "0.021,0.037,0.043"},
+        {"adaptive_pressure_advance", adaptive ? "1,1,1" : "0,0,0"},
+        {"sparse_infill_filament_id", 2}, {"internal_solid_filament_id", 2},
+        {"top_surface_filament_id", 2}, {"bottom_surface_filament_id", 2},
+        {"outer_wall_filament_id", 2}, {"inner_wall_filament_id", 2},
+        {"enable_prime_tower", 0}, {"skirt_loops", 0}, {"brim_type", "no_brim"},
+        {"machine_start_gcode", "; start pressure advance {pressure_advance[initial_extruder]}"},
+    });
+    config.option<ConfigOptionEnumsGeneric>("extruder_type", true)->values = {drive};
+    config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type", true)->values = {nvtHighFlow};
+    config.option<ConfigOptionStrings>("adaptive_pressure_advance_model")->values = {
+        constant_pressure_advance_model("0.012"), constant_pressure_advance_model("0.034"), constant_pressure_advance_model("0.056")};
+    Print print;
+    Model model;
+    Test::init_print({cube(5)}, print, model, config);
+    const std::string gcode = Test::gcode(print);
+    std::set<std::string> expected{"0.043"};
+    if (adaptive)
+        expected.insert("0.056");
+    CHECK(pressure_advance_values(gcode) == expected);
+    CHECK(gcode.find("; start pressure advance 0.043\n") != std::string::npos);
+    const int index = print.get_filament_config_indx(1, 0);
+    CHECK(print.config().filament_self_index.get_at(index) == 2);
+    CHECK_THAT(print.config().pressure_advance.get_at(index), Catch::Matchers::WithinAbs(0.043, 1e-9));
+}
+
+
+TEST_CASE("The multifilament fixture preserves default ownership and explicit variant tables", "[MultiFilament][PAFallback][Regression]")
+{
+    auto defaults = multifilament_config(2, {{"pressure_advance", "0.021,0.043"}});
+    CHECK(defaults.option<ConfigOptionInts>("filament_self_index")->values == std::vector<int>{1, 2});
+    CHECK(defaults.option<ConfigOptionStrings>("filament_extruder_variant")->values ==
+          std::vector<std::string>{"Direct Drive Standard", "Direct Drive Standard"});
+    CHECK(defaults.opt_serialize("pressure_advance") == "0.021,0.043");
+    auto explicit_table = multifilament_config(2, {
+        {"filament_self_index", "1,1,2,2"},
+        {"filament_extruder_variant", "Direct Drive Standard;Direct Drive High Flow;Bowden Standard;Bowden High Flow"},
+        {"filament_map", "2,1"}, {"pressure_advance", "0.021,0.037,0.043,0.049"},
+    });
+    CHECK(explicit_table.option<ConfigOptionInts>("filament_self_index")->values == std::vector<int>{1, 1, 2, 2});
+    CHECK(explicit_table.option<ConfigOptionStrings>("filament_extruder_variant")->values ==
+          std::vector<std::string>{"Direct Drive Standard", "Direct Drive High Flow", "Bowden Standard", "Bowden High Flow"});
+    CHECK(explicit_table.option<ConfigOptionInts>("filament_map")->values == std::vector<int>{2, 1});
+    CHECK(explicit_table.opt_serialize("pressure_advance") == "0.021,0.037,0.043,0.049");
+    auto invalid = multifilament_config(2, {
+        {"filament_self_index", "1"}, {"filament_extruder_variant", "Direct Drive Standard"},
+    });
+    CHECK(invalid.option<ConfigOptionInts>("filament_self_index")->values == std::vector<int>{1});
+    CHECK(invalid.option<ConfigOptionStrings>("filament_extruder_variant")->values.size() == 1);
+    FilamentLookupPrint print;
+    Model model;
+    Test::init_print({cube(2)}, print, model, invalid);
+    FilamentLookupPrint::FilamentIndexMap cache;
+    CHECK_THROWS_AS(print.get_config_index(1, -1, {"Direct Drive Standard"}, {1}, cache), SlicingError);
+}
+
+
+TEST_CASE("Two-tool slicing preserves fallback precedence before gathering filament columns", "[MultiFilament][PAProducer][Regression]")
+{
+    const ExtruderType drive = GENERATE(etDirectDrive, etBowden);
+    const bool adaptive = GENERATE(false, true);
+    const bool scalar_flow = GENERATE(false, true);
+    const int scenario = GENERATE(0, 1, 2, 3, 4, 5, 6, 7, 8);
+    CAPTURE(drive, adaptive, scenario, scalar_flow);
+    const std::string standard = get_extruder_variant_string(drive, nvtStandard);
+    const std::string high = get_extruder_variant_string(drive, nvtHighFlow);
+    const std::string tpu = get_extruder_variant_string(drive, nvtTPUHighFlow);
+    const std::string incompatible = get_extruder_variant_string(drive == etDirectDrive ? etBowden : etDirectDrive, nvtStandard);
+    std::vector<std::string> variants{"Direct Drive Standard"};
+    std::vector<int> owners{1};
+    std::vector<double> pa{0.021};
+    std::vector<std::string> models{constant_pressure_advance_model("0.012")};
+    const auto column = [&](const std::string &variant, double value, const std::string &prediction) {
+        variants.push_back(variant); owners.push_back(2); pa.push_back(value);
+        models.push_back(constant_pressure_advance_model(prediction));
+    };
+    if (scenario == 0) { column(tpu, .067, "0.089"); column(standard, .043, "0.056"); }
+    if (scenario == 1) { column(incompatible, .091, "0.099"); column(standard, .043, "0.056"); }
+    if (scenario == 2) { column(standard, .043, "0.056"); column(high, .049, "0.078"); }
+    if (scenario == 3) { column(high, .049, "0.078"); column(standard, .043, "0.056"); }
+    if (scenario == 4) column(tpu, .067, "0.089");
+    if (scenario == 5) { column(standard, .043, "0.056"); column(tpu, .067, "0.089"); }
+    if (scenario == 6) { column(tpu, .067, "0.089"); column(standard, .043, "0.056"); }
+    if (scenario == 7) column(incompatible, .091, "0.099");
+    // Scenario 8 deliberately defines no column owned by filament 2.
+    auto config = multifilament_config(2, {
+        {"gcode_flavor", "klipper"}, {"nozzle_diameter", "0.4,0.4"},
+        {"single_extruder_multi_material", 0}, {"filament_map", "1,2"}, {"filament_map_mode", "Manual"},
+        {"printer_extruder_id", "1,2"}, {"printer_extruder_variant", "Direct Drive Standard;" + standard},
+        {"extruder_variant_list", "Direct Drive Standard;" + standard + "," + high + "," + tpu},
+        {"outer_wall_filament_id", 2}, {"inner_wall_filament_id", 2}, {"sparse_infill_filament_id", 2},
+        {"internal_solid_filament_id", 2}, {"top_surface_filament_id", 2}, {"bottom_surface_filament_id", 2},
+        {"enable_prime_tower", 0}, {"skirt_loops", 0}, {"brim_type", "no_brim"},
+        {"machine_start_gcode", "; fallback PA {pressure_advance[initial_extruder]}"},
+        {"filament_flow_ratio", scalar_flow ? "0.95" : "0.99,0.95"},
+    });
+    config.option<ConfigOptionEnumsGeneric>("extruder_type", true)->values = {etDirectDrive, drive};
+    config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type", true)->values = {
+        nvtStandard, scenario == 5 ? nvtTPUHighFlow : scenario == 6 ? nvtHybrid : nvtHighFlow};
+    config.option<ConfigOptionInts>("filament_volume_map", true)->values = {nvtStandard, nvtStandard};
+    config.option<ConfigOptionStrings>("filament_extruder_variant", true)->values = variants;
+    config.option<ConfigOptionInts>("filament_self_index", true)->values = owners;
+    config.option<ConfigOptionFloats>("pressure_advance", true)->values = pa;
+    config.option<ConfigOptionBools>("enable_pressure_advance", true)->values.assign(pa.size(), true);
+    config.option<ConfigOptionBools>("adaptive_pressure_advance", true)->values.assign(pa.size(), adaptive);
+    config.option<ConfigOptionStrings>("adaptive_pressure_advance_model", true)->values = models;
+    Print print;
+    Model model;
+    const auto slice = [&]() { Test::init_print({cube(3)}, print, model, config); return Test::gcode(print); };
+    if (scenario >= 7) {
+        CHECK_THROWS_AS(slice(), SlicingError);
+        return;
+    }
+    const std::string gcode = slice();
+    const std::string expected = scenario == 2 || scenario == 3 ? "0.049" : scenario == 4 || scenario == 5 ? "0.067" : "0.043";
+    const std::string prediction = expected == "0.049" ? "0.078" : expected == "0.067" ? "0.089" : "0.056";
+    std::set<std::string> expected_values{expected};
+    if (adaptive) expected_values.insert(prediction);
+    CHECK(pressure_advance_values(gcode) == expected_values);
+    CHECK(gcode.find("; fallback PA " + expected + "\n") != std::string::npos);
+    const int selected = print.get_filament_config_indx(1, 0);
+    CHECK(print.config().filament_self_index.get_at(selected) == 2);
+    CHECK_THAT(print.config().pressure_advance.get_at(selected), Catch::Matchers::WithinAbs(std::stod(expected), 1e-9));
+    CHECK(print.config().adaptive_pressure_advance_model.get_at(selected) == constant_pressure_advance_model(prediction));
+    CHECK_THAT(print.config().filament_flow_ratio.get_at(selected), Catch::Matchers::WithinAbs(.95, 1e-9));
+}
+
+
+TEST_CASE("Apply distinguishes absent legacy owners from explicit malformed ownership", "[MultiFilament][PARawOwners][Regression]")
+{
+    const int malformed = GENERATE(0, 1, 2, 3, 4, 5);
+    CAPTURE(malformed);
+    auto config = multifilament_config(2, {
+        {"filament_map", "1,1"}, {"gcode_flavor", "klipper"},
+        {"pressure_advance", "0.021,0.043"}, {"enable_pressure_advance", "1,1"},
+        {"outer_wall_filament_id", 2}, {"inner_wall_filament_id", 2}, {"sparse_infill_filament_id", 2},
+        {"internal_solid_filament_id", 2}, {"top_surface_filament_id", 2}, {"bottom_surface_filament_id", 2},
+        {"skirt_loops", 0}, {"brim_type", "no_brim"}, {"enable_prime_tower", 0},
+        {"machine_start_gcode", "; legacy PA {pressure_advance[initial_extruder]}"},
+    });
+    if (malformed == 0 || malformed == 5) config.erase("filament_self_index");
+    else config.option<ConfigOptionInts>("filament_self_index", true)->values =
+        malformed == 1 ? std::vector<int>{1} : malformed == 2 ? std::vector<int>{1, 0} :
+        malformed == 3 ? std::vector<int>{1, -1} : std::vector<int>{};
+    if (malformed == 5)
+        config.option<ConfigOptionStrings>("filament_extruder_variant", true)->values = {"Direct Drive Standard"};
+    Print print;
+    Model model;
+    auto *object = model.add_object();
+    object->add_volume(cube(2));
+    object->add_instance();
+    // Call the public boundary directly: init_print merges defaults and would
+    // turn a truly absent owner option back into the default singleton {1}.
+    if (malformed == 0) {
+        print.apply(model, config);
+        const std::string gcode = Test::gcode(print);
+        CHECK(pressure_advance_values(gcode) == std::set<std::string>{"0.043"});
+        CHECK(gcode.find("; legacy PA 0.043\n") != std::string::npos);
+        const int index = print.get_filament_config_indx(1, 0);
+        CHECK(print.config().filament_self_index.get_at(index) == 2);
+    } else {
+        CHECK_THROWS_AS(print.apply(model, config), SlicingError);
+    }
+}
+
+TEST_CASE("Apply replays dynamic slots with the same filament fallback policy", "[MultiFilament][PAProducer][Regression]")
+{
+    auto config = multifilament_config(2, {
+        {"nozzle_diameter", "0.4,0.4"}, {"filament_map", "1,2"},
+        {"printer_extruder_id", "1,2"}, {"printer_extruder_variant", "Direct Drive Standard;Direct Drive High Flow"},
+        {"extruder_variant_list", "Direct Drive Standard;Direct Drive High Flow"},
+        {"filament_extruder_variant", "Direct Drive Standard;Direct Drive TPU High Flow;Direct Drive Standard"},
+        {"filament_self_index", "1,2,2"}, {"pressure_advance", "0.021,0.067,0.043"},
+    });
+    config.option<ConfigOptionEnumsGeneric>("extruder_type", true)->values = {etDirectDrive, etDirectDrive};
+    config.option<ConfigOptionEnumsGeneric>("nozzle_volume_type", true)->values = {nvtStandard, nvtHighFlow};
+    const std::vector<MultiNozzleUtils::NozzleInfo> nozzles{
+        {"0.4", nvtStandard, 0, 0}, {"0.4", nvtHighFlow, 1, 1}};
+    auto plan = MultiNozzleUtils::LayeredNozzleGroupResult::create(
+        std::vector<std::vector<int>>{{0, 0}, {0, 1}}, nozzles, {0, 1}, {});
+    REQUIRE(plan.has_value());
+    REQUIRE(plan->is_support_dynamic_nozzle_map());
+    Print print;
+    print.set_nozzle_group_result(std::make_shared<MultiNozzleUtils::LayeredNozzleGroupResult>(*plan));
+    Model model;
+    Test::init_print({cube(2)}, print, model, config);
+    const auto &ids = print.config().filament_self_index.values;
+    CHECK(ids == std::vector<int>{1, 2, 2});
+    CHECK(print.config().filament_extruder_variant.values ==
+          std::vector<std::string>{"Direct Drive Standard", "Direct Drive Standard", "Direct Drive Standard"});
+    CHECK(print.config().pressure_advance.values == std::vector<double>{.021, .043, .043});
+    for (const int layer : {0, 1}) {
+        const int index = print.get_filament_config_indx(1, layer);
+        CHECK(ids.at(index) == 2);
+        CHECK_THAT(print.config().pressure_advance.get_at(index), Catch::Matchers::WithinAbs(.043, 1e-9));
+    }
+}

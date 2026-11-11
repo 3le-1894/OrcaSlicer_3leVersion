@@ -190,7 +190,7 @@ TEST_CASE("Machine envelope emits max limit among used extruders", "[GCodeWriter
     SECTION("Multi extruder - max of used extruders is emitted") {
         // Build config with 2 extruders that have *different* machine limits.
         // Extruder 1 has higher values; the emitted G-code must use the max.
-        DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+        DynamicPrintConfig config = multifilament_config(2);
 
         // Print basics
         config.set_key_value("emit_machine_limits_to_gcode", new ConfigOptionBool(true));
@@ -301,7 +301,7 @@ TEST_CASE("EXTRUDER_LIMIT per-extruder clamping and max fallback", "[GCodeWriter
     // --- Build config with 2 extruders that have different machine limits ---
     // Extruder 0: low limits
     // Extruder 1: high limits
-    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    DynamicPrintConfig config = multifilament_config(2);
 
     config.set_key_value("emit_machine_limits_to_gcode", new ConfigOptionBool(true));
     config.set_key_value("gcode_flavor",                 new ConfigOptionEnum<GCodeFlavor>(gcfMarlinFirmware));
@@ -547,7 +547,7 @@ SCENARIO("Toolchange emission and prefix per printer kind", "[GCodeWriter][H2C]"
 // Shared dual-extruder printer config for the toolchange-count scenarios below.
 static DynamicPrintConfig dual_extruder_toolchange_config()
 {
-    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    DynamicPrintConfig config = multifilament_config(2);
     config.set_key_value("gcode_flavor",               new ConfigOptionEnum<GCodeFlavor>(gcfMarlinFirmware));
     config.set_key_value("emit_machine_limits_to_gcode", new ConfigOptionBool(false));
     config.set_key_value("machine_start_gcode",        new ConfigOptionString(""));
@@ -892,7 +892,7 @@ static int count_travels_after_descent(const std::string &gcode)
         if (!line.cmd_is("G0") && !line.cmd_is("G1") && !line.cmd_is("G2") && !line.cmd_is("G3"))
             return;
         const bool xy = line.dist_X(self) != 0.f || line.dist_Y(self) != 0.f;
-        if (line.has(E) || line.dist_Z(self) > EPSILON) {
+        if ((xy && line.extruding(self)) || line.dist_Z(self) > EPSILON) {
             printed |= xy && line.extruding(self);
             descended = false;
         } else if (xy) {
@@ -906,6 +906,53 @@ static int count_travels_after_descent(const std::string &gcode)
         }
     });
     return travels;
+}
+
+
+struct LiftRouteWitness {
+    int detours = 0;
+    int tower_returns = 0;
+};
+
+static LiftRouteWitness lift_route_witness(const std::string &gcode)
+{
+    LiftRouteWitness result;
+    GCodeReader reader;
+    Vec2d previous_direction = Vec2d::Zero();
+    bool tower = false, lifted = false, high_travel = false, descended = false;
+    double high_z = 0.;
+    reader.parse_buffer(gcode, [&](GCodeReader &self, const GCodeReader::GCodeLine &line) {
+        if (line.raw().find("CP TOOLCHANGE END") != std::string::npos) {
+            tower = true;
+            lifted = high_travel = descended = false;
+        }
+        const Vec2d direction(line.dist_X(self), line.dist_Y(self));
+        const bool xy = direction.norm() > EPSILON;
+        const bool deposition = xy && line.extruding(self);
+        if (tower && line.dist_Z(self) > EPSILON) {
+            lifted = true;
+            high_z = line.new_Z(self);
+        }
+        if (tower && lifted && xy && std::abs(line.new_Z(self) - high_z) < EPSILON)
+            high_travel = true;
+        if (tower && lifted && high_travel && line.dist_Z(self) < -EPSILON)
+            descended = true;
+        if (tower && deposition) {
+            if (lifted && high_travel && descended)
+                ++result.tower_returns;
+            tower = false;
+        }
+        const bool route = xy && !deposition && line.raw().find("move to first") != std::string::npos;
+        if (route) {
+            if (previous_direction.norm() > EPSILON &&
+                std::abs(previous_direction.x() * direction.y() - previous_direction.y() * direction.x()) > EPSILON)
+                ++result.detours;
+            previous_direction = direction;
+        } else if (xy || deposition) {
+            previous_direction = Vec2d::Zero();
+        }
+    });
+    return result;
 }
 
 TEST_CASE("A lifted nozzle reaches its target height only after the travel back to the print", "[GCodeWriter][ZHopDestination][Regression]") {
@@ -934,7 +981,11 @@ TEST_CASE("A lifted nozzle reaches its target height only after the travel back 
     const std::vector<std::vector<ConfigBase::SetDeserializeItem>> overrides{{{"extruder", "1"}}, {{"extruder", "2"}}};
     Test::init_print({Test::cube(20), Test::cube(20)}, print, model, config, &overrides);
 
-    CHECK(count_descending_travels(Test::gcode(print)) == 0);
+    const std::string gcode = Test::gcode(print);
+    CHECK(count_descending_travels(gcode) == 0);
+    const auto witness = lift_route_witness(gcode);
+    INFO("tower returns " << witness.tower_returns);
+    CHECK(witness.tower_returns > 0);
 }
 
 TEST_CASE("A lifted nozzle keeps its height over a detour around a concave part", "[GCodeWriter][ZHopDestination][Regression]") {
@@ -962,6 +1013,9 @@ TEST_CASE("A lifted nozzle keeps its height over a detour around a concave part"
     const std::string gcode = Test::gcode(print);
     CHECK(count_descending_travels(gcode) == 0);
     CHECK(count_travels_after_descent(gcode) == 0);
+    const auto witness = lift_route_witness(gcode);
+    INFO("non-collinear avoided route waypoints " << witness.detours);
+    CHECK(witness.detours > 0);
 }
 
 TEST_CASE("A lifted travel that ends lower descends only at its destination", "[GCodeWriter][ZHopDestination][Regression]") {
@@ -1006,8 +1060,16 @@ TEST_CASE("Lifted travel descends at the destination with plate offsets and lazy
     CAPTURE(pending, nozzle, force_z, target_z);
     GCodeWriter writer;
     configure_lift_writer(writer);
+    writer.config.filament_map.values = {2, 1};
+    writer.config.z_hop.values = {0.4, 0.8};
+    writer.config.retract_lift_above.values = {0., 0.};
+    writer.config.retract_lift_below.values = {0., 0.};
     writer.set_extruders({0, 1});
-    writer.toolchange(nozzle, nozzle);
+    writer.toolchange(nozzle, 1 - nozzle);
+    REQUIRE(writer.filament()->id() == nozzle);
+    REQUIRE(writer.filament()->extruder_id() == 1 - nozzle);
+    REQUIRE(writer.filament()->config_index() == int(nozzle));
+    const double lifted_z = 5.0 + writer.config.z_hop.get_at(nozzle);
     writer.set_xy_offset(3.0, 4.0);
     writer.travel_to_xyz(Vec3d(20.0, 20.0, 5.0));
     std::string moves;
@@ -1016,7 +1078,7 @@ TEST_CASE("Lifted travel descends at the destination with plate offsets and lazy
     else
         moves += writer.eager_lift(LiftType::NormalLift);
     moves += writer.travel_to_xyz(Vec3d(25.0, 25.0, 5.0));
-    REQUIRE_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(5.4, EPSILON));
+    REQUIRE_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(lifted_z, EPSILON));
     // A pending lift on the first leg is realized there; intermediate waypoints stay high.
     if (pending)
         moves += writer.travel_to_xy(Vec2d(30.0, 25.0));
@@ -1027,10 +1089,10 @@ TEST_CASE("Lifted travel descends at the destination with plate offsets and lazy
     bool high_xy = false;
     bool descended = false;
     reader.parse_buffer("G1 X17 Y16 Z5\n" + moves, [&](GCodeReader &self, const GCodeReader::GCodeLine &line) {
-        if (line.dist_Z(self) > EPSILON && line.new_Z(self) > 5.3)
+        if (line.dist_Z(self) > EPSILON && line.new_Z(self) > lifted_z - EPSILON)
             raised = true;
         const bool xy = std::abs(line.dist_X(self)) > EPSILON || std::abs(line.dist_Y(self)) > EPSILON;
-        if (raised && xy && line.new_Z(self) > 5.3)
+        if (raised && xy && line.new_Z(self) > lifted_z - EPSILON)
             high_xy = true;
         if (raised && line.dist_Z(self) < -EPSILON) {
             CHECK_FALSE(xy);
@@ -1074,4 +1136,69 @@ TEST_CASE("A pending lift at a coincident destination preserves the current heig
     });
     CHECK_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(5., EPSILON));
     CHECK_THAT(writer.get_zhop(), Catch::Matchers::WithinAbs(0., EPSILON));
+}
+
+TEST_CASE("Retraction commands do not hide low travel after a descent", "[GCodeWriter][ZHopDestination][Regression]")
+{
+    const std::string prefix = "M83\nG1 X10 Y10 Z1\nG1 X20 E1\nG1 Z1.4\nG1 X30\nG1 Z1\n";
+    CHECK(count_travels_after_descent(prefix + "G1 E-0.8\nG1 E0.8\nG1 X40\n") == 1);
+    CHECK(count_travels_after_descent(prefix + "G1 X40 E1\nG1 X50\n") == 0);
+}
+
+
+TEST_CASE("Mapped physical tools retain distinct lifts across tool transitions", "[GCodeWriter][ZHopDestination][Regression]")
+{
+    GCodeWriter writer;
+    configure_lift_writer(writer);
+    writer.config.filament_map.values = {2, 1};
+    writer.config.z_hop.values = {0.4, 0.8};
+    writer.config.retract_lift_above.values = {0., 0.};
+    writer.config.retract_lift_below.values = {0., 0.};
+    writer.set_extruders({0, 1});
+    for (const unsigned int filament : {0u, 1u, 0u}) {
+        CAPTURE(filament);
+        writer.toolchange(filament, 1 - filament);
+        REQUIRE(writer.filament()->id() == filament);
+        REQUIRE(writer.filament()->extruder_id() == 1 - filament);
+        REQUIRE(writer.filament()->config_index() == int(filament));
+        writer.travel_to_xyz(Vec3d(20., 20., 5.));
+        writer.lazy_lift(LiftType::NormalLift);
+        writer.travel_to_xyz(Vec3d(25., 25., 5.));
+        const double high_z = 5. + writer.config.z_hop.get_at(filament);
+        REQUIRE_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(high_z, EPSILON));
+        const std::string descent = writer.travel_to_xyz(Vec3d(40., 40., 5.), "", true);
+        GCodeReader reader;
+        reader.parse_buffer("G1 X25 Y25 Z" + std::to_string(high_z) + "\n", [](GCodeReader &, const GCodeReader::GCodeLine &) {});
+        bool high_xy = false, down = false;
+        reader.parse_buffer(descent, [&](GCodeReader &self, const GCodeReader::GCodeLine &line) {
+            const bool xy = line.dist_X(self) != 0.f || line.dist_Y(self) != 0.f;
+            if (xy) {
+                CHECK_THAT(line.new_Z(self), Catch::Matchers::WithinAbs(high_z, EPSILON));
+                high_xy = true;
+            }
+            if (line.dist_Z(self) < -EPSILON) {
+                CHECK(high_xy);
+                CHECK_FALSE(xy);
+                CHECK_THAT(line.new_X(self), Catch::Matchers::WithinAbs(40., EPSILON));
+                CHECK_THAT(line.new_Y(self), Catch::Matchers::WithinAbs(40., EPSILON));
+                down = true;
+            }
+        });
+        CHECK(down);
+        CHECK_THAT(writer.get_position().z(), Catch::Matchers::WithinAbs(5., EPSILON));
+        CHECK_THAT(writer.get_zhop(), Catch::Matchers::WithinAbs(0., EPSILON));
+    }
+}
+
+TEST_CASE("The shared variant lookup retains its legacy column-zero fallback", "[SharedLookupContract][Regression]")
+{
+    // The shared helper deliberately keeps its legacy fallback. Filament-specific
+    // identity preservation is exercised through Print in test_multifilament.cpp.
+    const std::vector<std::string> variants{"Direct Drive Standard", "Direct Drive High Flow", "Direct Drive Standard"};
+    const std::vector<int> owners{1, 1, 2};
+    const int selected = get_config_index_base(nvtHighFlow, etDirectDrive, 2, variants, owners);
+    REQUIRE(selected >= 0);
+    REQUIRE(selected < int(owners.size()));
+    CHECK(selected == 0);
+    CHECK(owners[selected] == 1);
 }

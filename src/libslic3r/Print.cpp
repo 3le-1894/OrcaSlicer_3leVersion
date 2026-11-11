@@ -3956,22 +3956,9 @@ void Print::update_filament_self_index_cache()
         values = m_config.filament_self_index.values;
     }
 
-    size_t expected_size = m_config.filament_extruder_variant.values.size();
-    m_filament_self_index.clear();
-    if (expected_size == 0) {
-        m_filament_index_map.clear();
-        m_nozzle_index_map.clear();
-        return;
-    }
-    m_filament_self_index.resize(expected_size, 1);
-    if (!values.empty()) {
-        for (size_t i = 0; i < expected_size; ++i) {
-            int v = i < values.size() ? values[i] : 1;
-            if (v <= 0)
-                v = 1;
-            m_filament_self_index[i] = v;
-        }
-    }
+    // Keep raw ownership intact: missing/short/nonpositive ids must never be
+    // manufactured into ownership by filament 1 before the resolver validates it.
+    m_filament_self_index = std::move(values);
     m_filament_index_map.clear();
     m_nozzle_index_map.clear();
 }
@@ -3985,34 +3972,49 @@ int Print::get_nozzle_config_index(int filament_id, int layer_id)
 
 int Print::get_config_index(int filament_id, int layer_id, const std::vector<std::string> &variant_list, const std::vector<int>& self_index_list, FilamentIndexMap &index_map)
 {
+    const auto invalid_settings = [&]() {
+        return SlicingError(Slic3r::format(
+            "Cannot resolve compatible nozzle settings for filament %d. Check the filament preset variants and physical nozzle mapping.",
+            filament_id + 1));
+    };
+    if (filament_id < 0 || variant_list.empty() || variant_list.size() != self_index_list.size() ||
+        m_config.extruder_type.values.empty() || m_config.nozzle_volume_type.values.empty())
+        throw invalid_settings();
+
     auto group_result = get_layered_nozzle_group_result();
-    // Orca: defensive — when no grouping producer has published a result yet, fall back to the
-    // static identity: one filament-variant column per filament.
-    if (!group_result)
-        return filament_id;
-    auto nozzle_info  = group_result->get_nozzle_for_filament(filament_id, layer_id);
-    if (!nozzle_info.has_value()) {
-        // Orca: this fallback runs per-filament/per-layer in the g-code hot path — log once per filament
-        // (reset each slice) instead of flooding thousands of identical lines that bury the real error.
-        if (m_missing_nozzle_group_logged.insert(filament_id).second)
-            BOOST_LOG_TRIVIAL(error) << __FUNCTION__
-                                     << boost::format(", Line %1%: could not found group_nozzle_info corresponding to filament_id %2%, layer_id %3% (further occurrences for this filament suppressed)") % __LINE__ % filament_id %
-                                            layer_id;
-        return 0;
-    }
-
-    ExtruderType     extruder_type      = ExtruderType(m_config.extruder_type.get_at(nozzle_info->extruder_id));
-    NozzleVolumeType nozzle_volume_type = nozzle_info->volume_type;
-
-    FilamentIndexKey key{filament_id, extruder_type, nozzle_volume_type};
-    auto             iter = index_map.find(key);
-    if (iter == index_map.end()) {
-        int index = get_config_index_base(nozzle_volume_type, extruder_type, filament_id + 1, variant_list, self_index_list);
-        index_map[key] = index;
-        return index;
+    int extruder_id;
+    NozzleVolumeType nozzle_volume_type;
+    if (group_result) {
+        const auto nozzle_info = group_result->get_nozzle_for_filament(filament_id, layer_id);
+        if (!nozzle_info)
+            throw invalid_settings();
+        extruder_id = nozzle_info->extruder_id;
+        nozzle_volume_type = nozzle_info->volume_type;
     } else {
-        return index_map[key];
+        // Before grouping, resolve against the configured physical tool rather
+        // than assuming the filament id is also its variant-column index.
+        if (size_t(filament_id) >= m_config.filament_map.size())
+            throw invalid_settings();
+        extruder_id = m_config.filament_map.get_at(filament_id) - 1;
+        nozzle_volume_type = NozzleVolumeType(m_config.nozzle_volume_type.get_at(std::max(0, extruder_id)));
     }
+    if (extruder_id < 0 || size_t(extruder_id) >= m_config.nozzle_diameter.size() ||
+        nozzle_volume_type < nvtStandard || nozzle_volume_type > nvtMaxNozzleVolumeType)
+        throw invalid_settings();
+    const ExtruderType extruder_type = ExtruderType(m_config.extruder_type.get_at(extruder_id));
+    if (extruder_type < etDirectDrive || extruder_type > etMaxExtruderType)
+        throw invalid_settings();
+
+    const FilamentIndexKey key{filament_id, extruder_type, nozzle_volume_type};
+    const auto cached = index_map.find(key);
+    if (group_result && cached != index_map.end())
+        return cached->second;
+
+    const int selected = resolve_filament_variant_index(nozzle_volume_type, extruder_type, filament_id + 1,
+                                                         variant_list, self_index_list);
+    if (group_result)
+        index_map[key] = selected;
+    return selected;
 }
 
 int Print::get_config_index(int filament_id, int layer_id, const std::vector<std::string> &variant_list, const std::vector<int>& self_index_list, PrintIndexMap &index_map)

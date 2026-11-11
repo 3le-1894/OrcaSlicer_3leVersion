@@ -550,6 +550,11 @@ extern std::string get_extruder_variant_string(ExtruderType extruder_type, Nozzl
 // entry matching the given extruder/volume type and id. Returns 0 when no entry matches.
 extern int get_config_index_base(NozzleVolumeType volume_type, ExtruderType extruder_type, int variant_id_1based, const std::vector<std::string>& variant_list, const std::vector<int>& variant_ids_1based);
 
+// Filament-only lookup: exact, then Standard, then another concrete volume of
+// the same owner and drive type. Invalid ownership or no compatible slot throws.
+extern int resolve_filament_variant_index(NozzleVolumeType volume_type, ExtruderType extruder_type, int filament_id_1based,
+    const std::vector<std::string>& variants, const std::vector<int>& owners);
+
 static std::set<NozzleVolumeType> get_valid_nozzle_volume_type() {
     std::set<NozzleVolumeType> type;
     for (int i = 0; i <= nvtMaxNozzleVolumeType; ++i) {

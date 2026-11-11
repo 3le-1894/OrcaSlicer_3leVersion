@@ -210,6 +210,14 @@ DynamicPrintConfig multifilament_config(unsigned int filaments, std::initializer
 	config.set_deserialize_strict({ { "nozzle_diameter", "0.4" }, { "filament_diameter", diameters } });
 	config.set_num_filaments(filaments);
 
+    // This producer creates one Standard column per filament. Establish ownership
+    // before caller overrides, which may supply an explicit multi-variant table.
+    auto &owners = config.option<ConfigOptionInts>("filament_self_index", true)->values;
+    owners.resize(filaments);
+    for (unsigned int i = 0; i < filaments; ++i)
+        owners[i] = int(i + 1);
+    config.option<ConfigOptionStrings>("filament_extruder_variant", true)->values.assign(filaments, "Direct Drive Standard");
+
 	// These are read by filament id during export but absent from filament_option_keys(),
 	// so set_num_filaments leaves them size 1; size them too, else out-of-range access.
 	const auto &defaults = FullPrintConfig::defaults();
