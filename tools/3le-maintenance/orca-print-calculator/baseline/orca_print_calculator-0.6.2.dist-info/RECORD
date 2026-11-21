@@ -1,0 +1,15 @@
+orca_print_calculator/__init__.py,sha256=VEBFpuXacgOzFbUpfFQgP5ah2IqamAtGmy5loaBUhyM,1779
+orca_print_calculator/_assets.py,sha256=_db3nayA8P2sqOd6_GUhOa_1fzfsjpRSA09EJuyAXtU,1162424
+orca_print_calculator/core.py,sha256=A9xx5QtG0JR0hOnBi24H4sSNSRROnUXoOQ_QTJ8nNAg,30958
+orca_print_calculator/host.py,sha256=kVGUSryPwqs1zbYLxNft_I8o1P0Nno-xOYX676jPC90,25585
+orca_print_calculator/orca_print_calculator-icon.png,sha256=hR7rstL6FoAfq5mCpP-ESqVckSphuceMKZOzH3A9Z8Y,2438
+orca_print_calculator-0.6.2.dist-info/METADATA,sha256=lapKEBkVtIubkHoHUtSOymP-R6hRTVi-qADyoYaxieI,244
+orca_print_calculator-0.6.2.dist-info/WHEEL,sha256=Sa6msqY2uJbjjXKtL694JRwMiEatAq4bfqZTljrWFtU,109
+orca_print_calculator-0.6.2.dist-info/top_level.txt,sha256=VhNsqKK3dXNCYSs9l_g5nhFOo2FPetRt6fduq6lys1I,22
+orca_print_calculator-0.6.2.dist-info/licenses/LICENSE,sha256=Gxx_NQtBFd9oG2YgbLImB10laNTFCjbjh2hiAXPzz4M,1063
+orca_print_calculator-0.6.2.dist-info/licenses/Lucide.txt,sha256=tJUEe9k6mwaRNREHb1BNq6F9W76z4GUPO7U6QiAynFc,3208
+orca_print_calculator-0.6.2.dist-info/licenses/Manrope.txt,sha256=WBcuDA-sLNqKN7NIFku1XkSw5pBR5VfpKx0_aRAUH3s,4387
+orca_print_calculator-0.6.2.dist-info/licenses/PrimeUIX.txt,sha256=NZjk89KgnFw0AkEZxL6IjV3n_5K1jEq9q8hrBEMjYkQ,2052
+orca_print_calculator-0.6.2.dist-info/licenses/PrimeVue.txt,sha256=CqacVZEEAj5RzmJEu59PYFttrYGa-PsbMX2NhT25h2E,2048
+orca_print_calculator-0.6.2.dist-info/licenses/Vue.txt,sha256=G7hcybE7ge9ByBxRhmFy_DReBQPIZyamdVt5ZZC3AXU,1091
+orca_print_calculator-0.6.2.dist-info/RECORD,,

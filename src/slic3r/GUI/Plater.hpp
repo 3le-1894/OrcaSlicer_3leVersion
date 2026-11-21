@@ -499,6 +499,8 @@ public:
     void deselect_all();
     void exit_gizmo();
     void remove(size_t obj_idx);
+    unsigned long long calculator_project_epoch() const;
+    bool calculator_mutating() const;
     void reset(bool apply_presets_change = false);
     void reset_with_confirm();
     //BBS: return int for various result

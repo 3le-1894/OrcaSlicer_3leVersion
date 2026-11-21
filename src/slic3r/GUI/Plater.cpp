@@ -6745,8 +6745,16 @@ public:
 };
 
 // Plater / private
+// UI mutation transactions include modal/nested event loops during project loading.
+struct CalculatorMutationGuard {
+    unsigned& depth;
+    explicit CalculatorMutationGuard(unsigned& value) : depth(value) { ++depth; }
+    ~CalculatorMutationGuard() { --depth; }
+};
 struct Plater::priv
 {
+    unsigned long long calculator_epoch = 0;
+    unsigned calculator_mutation_depth = 0;
     // PIMPL back pointer ("Q-Pointer")
     Plater *q;
     Sidebar *  sidebar;
@@ -8321,6 +8329,7 @@ void read_binary_stl(const std::string& filename, std::string& model_id, std::st
 // BBS: backup & restore
 std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, LoadStrategy strategy, bool ask_multi)
 {
+    CalculatorMutationGuard calculator_transaction(calculator_mutation_depth);
     std::vector<size_t> empty_result;
     bool dlg_cont = true;
     bool is_user_cancel = false;
@@ -10065,6 +10074,8 @@ void Plater::priv::delete_all_objects_from_model()
 
 void Plater::priv::reset(bool apply_presets_change)
 {
+    CalculatorMutationGuard calculator_transaction(calculator_mutation_depth);
+    ++calculator_epoch;
     Plater::TakeSnapshot snapshot(q, _u8L("Reset Project"), UndoRedo::SnapshotType::ProjectSeparator);
 
     clear_warnings();
@@ -15023,6 +15034,7 @@ SLAPrint&       Plater::sla_print()         { return p->sla_print; }
 
 int Plater::new_project(bool skip_confirm, bool silent, const wxString& project_name)
 {
+    CalculatorMutationGuard calculator_transaction(p->calculator_mutation_depth);
     model().calib_pa_pattern.reset(nullptr);
     model().plates_custom_gcodes.clear();
 
@@ -15102,6 +15114,7 @@ LoadType determine_load_type(std::string filename, std::string override_setting 
 void Plater::load_project(wxString const& filename2,
     wxString const& originfile)
 {
+    CalculatorMutationGuard calculator_transaction(p->calculator_mutation_depth);
     model().calib_pa_pattern.reset(nullptr);
     model().plates_custom_gcodes.clear();
 
@@ -17856,6 +17869,7 @@ void Plater::load_gcode()
 //BBS: remove GCodeViewer as seperate APP logic
 void Plater::load_gcode(const wxString& filename)
 {
+    CalculatorMutationGuard calculator_transaction(p->calculator_mutation_depth);
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << __LINE__ << " entry and filename: " << filename;
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__;
     if (! is_gcode_file(into_u8(filename))
@@ -18774,6 +18788,9 @@ void Plater::deselect_all() { p->deselect_all(); }
 void Plater::exit_gizmo() { p->exit_gizmo(); }
 
 void Plater::remove(size_t obj_idx) { p->remove(obj_idx); }
+unsigned long long Plater::calculator_project_epoch() const { return p->calculator_epoch; }
+bool Plater::calculator_mutating() const { return p->calculator_mutation_depth != 0; }
+
 void Plater::reset(bool apply_presets_change) { p->reset(apply_presets_change); }
 void Plater::reset_with_confirm()
 {

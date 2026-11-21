@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: orca-print-calculator
+Version: 0.6.2
+Summary: Prices every build plate of the open OrcaSlicer project: filament, energy, labor, fees and a suggested selling price.
+Author: bloodf
+License: MIT
+Requires-Python: >=3.12

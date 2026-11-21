@@ -2,6 +2,8 @@
 #define slic3r_GUI_BackgroundSlicingProcess_hpp_
 
 #include <string>
+#include <atomic>
+#include <functional>
 #include <condition_variable>
 #include <mutex>
 
@@ -175,6 +177,10 @@ public:
 		STATE_EXIT,
 		STATE_EXITED,
 	};
+    // UI-only, non-yielding native copy. Acquire-load publishes idle worker state without
+    // contending with execute_ui_task's mutex try-lock/cancellation convention.
+    // Only UI control starts new work; the copy callback must not yield/call Python.
+    bool copy_calculator_idle(const std::function<void(unsigned long long)>& copy);
 	State 	state() 	const { return m_state; }
 	bool    idle() 		const { return m_state == STATE_IDLE; }
 	bool    running() 	const { return m_state == STATE_STARTED || m_state == STATE_RUNNING || m_state == STATE_FINISHED || m_state == STATE_CANCELED; }
@@ -254,7 +260,8 @@ private:
 	// Mutex and condition variable to synchronize m_thread with the UI thread.
 	std::mutex 		 			m_mutex;
 	std::condition_variable		m_condition;
-	State 						m_state = STATE_INITIAL;
+    unsigned long long m_calculator_generation = 0;
+	std::atomic<State> m_state{STATE_INITIAL};
 
 	// For executing tasks from the background thread on UI thread synchronously (waiting for result) using wxWidgets CallAfter().
 	// When the background proces is canceled, the UITask has to be invalidated as well, so that it will not be

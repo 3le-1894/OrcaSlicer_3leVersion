@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source_dir=/home/elemental/Documents/Codex/2026-10-21/you-are-orca-the-user-s/work/dual-nozzle-reliability
+install_root=/home/elemental/Applications/OrcaCustom
+mode=${1:-build}
+[[ $# -eq 0 ]] || shift
+mkdir -p "$install_root/update-logs"
+exec 9>"$install_root/update-logs/update.lock"
+flock -n 9 || { echo 'Another Orca update is running.' >&2; exit 1; }
+log="$install_root/update-logs/$(date +%Y%m%d-%H%M%S)-$$.log"
+exec > >(tee -a "$log") 2>&1
+restart_companion=0
+recovery_backup=
+finish() {
+    local result=$?
+    trap - EXIT
+    if [[ -n "$recovery_backup" && ! -e "$install_root/runtime" ]]; then
+        if ! mv "$recovery_backup" "$install_root/runtime"; then
+            echo "Runtime restoration failed; backup is at $recovery_backup. Companion left stopped." >&2
+            restart_companion=0
+            result=1
+        fi
+    fi
+    if [[ "$restart_companion" == 1 ]]; then
+        echo 'Restarting Orca companion...'
+        if ! systemctl --user start orca-companion.service; then
+            echo 'Companion restart failed. Check: journalctl --user -u orca-companion.service -n 50' >&2
+            result=1
+        elif ! systemctl --user is-active --quiet orca-companion.service; then
+            echo 'Companion did not become active.' >&2
+            result=1
+        fi
+    fi
+    exit "$result"
+}
+trap finish EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+prepare_companion() {
+    local state answer
+    state=$(systemctl --user show orca-companion.service --property=ActiveState --value)
+    case "$state" in
+    active)
+        require_orca_closed
+        echo 'Pause new slicing submissions and collect any completed async results.'
+        echo 'The companion loses its in-memory async job records when restarted.'
+        read -r -p 'Are all jobs finished and new submissions paused? Type yes: ' answer
+        [[ "$answer" == yes ]] || { echo 'Deployment cancelled; companion left running.'; exit 1; }
+        # Recheck after confirmation; never intentionally terminate an Orca process.
+        require_orca_closed
+        restart_companion=1
+        echo 'Stopping Orca companion for runtime replacement...'
+        systemctl --user stop orca-companion.service
+        ;;
+    inactive|failed) ;;
+    *) echo "Companion is $state; retry after it settles." >&2; exit 1 ;;
+    esac
+    require_idle
+}
+require_idle() {
+    # Activation requires a fully stopped companion and no running Orca binary.
+    local state
+    state=$(systemctl --user show orca-companion.service --property=ActiveState --value)
+    [[ "$state" == inactive || "$state" == failed ]] || {
+        echo 'Close Orca and, once companion jobs are finished, stop orca-companion.service before deploying.' >&2
+        exit 1
+    }
+    require_orca_closed
+}
+require_orca_closed() {
+    /home/elemental/.local/libexec/orca-close-windows --check
+}
+close_orca_windows() {
+    /home/elemental/.local/libexec/orca-close-windows --close
+}
+
+case "$mode" in
+build|deploy)
+    close_orca_windows
+    cd "$source_dir"
+    # Pass -d here when dependency compilation is needed; normal builds are incremental.
+    bash build_linux.sh -s -t -i -j "${ORCA_BUILD_JOBS:-4}" "$@"
+    regex=${ORCA_TEST_REGEX:-'synced to the cloud|The build height check'}
+    ctest --test-dir build -C Release --output-on-failure --no-tests=error -R "$regex"
+    if [[ -f tests/libslic3r/test_shortest_path.cpp ]]; then
+        # Fail closed if the travel patch is present but its registered tests are missing.
+        ctest --test-dir build -C Release --output-on-failure --no-tests=error -L '^TravelOptimization$'
+    fi
+    [[ "$mode" == deploy ]] || { echo "Build/tests complete. Log: $log"; exit 0; }
+    require_orca_closed
+    package="$source_dir/build/package"
+    for entry in orca-slicer bin/orca-slicer libexec/orca-slicer-env resources/profiles; do
+        [[ -e "$package/$entry" ]] || { echo "Missing package component: $entry"; exit 1; }
+    done
+    stamp=$(date +%Y%m%d-%H%M%S)-$$
+    staged="$install_root/runtime.staging-$stamp"
+    backup="$install_root/runtime.backup-$stamp"
+    mkdir "$staged"
+    cp -a "$package/." "$staged/"
+    python3 - "$source_dir" "$staged/build.json" <<'PY'
+import datetime, hashlib, json, subprocess, sys
+from pathlib import Path
+source, destination = sys.argv[1:]
+def git(*args):
+    return subprocess.check_output(['git','-C',source,*args])
+Path(destination).write_text(json.dumps({
+    'base_commit': git('rev-parse','HEAD').decode().strip(),
+    'source_directory': source,
+    'tracked_diff_sha256': hashlib.sha256(git('diff','HEAD','--binary')).hexdigest(),
+    'status': git('status','--short').decode(),
+    'installed_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+}, indent=2)+'\n')
+PY
+    # Stop only after build, tests and staging succeed.
+    prepare_companion
+    [[ -d "$install_root/runtime" && ! -L "$install_root/runtime" ]] || {
+        echo 'Expected an existing runtime directory; activation aborted.'; exit 1;
+    }
+    recovery_backup="$backup"
+    mv "$install_root/runtime" "$backup"
+    if ! mv "$staged" "$install_root/runtime"; then
+        mv "$backup" "$install_root/runtime"
+        exit 1
+    fi
+    echo "Installed runtime. Previous runtime: $backup"
+    echo "Rollback: $0 rollback '$backup'"
+    restart_companion=1
+    echo 'Runtime installed; the companion will now start automatically.'
+    ;;
+rollback)
+    [[ $# -eq 1 ]] || { echo "Usage: $0 rollback /absolute/path/to/runtime.backup-TIMESTAMP"; exit 1; }
+    backup=$1
+    [[ "$backup" == "$install_root"/runtime.backup-* && -d "$backup" && ! -L "$backup" && -x "$backup/orca-slicer" ]] || {
+        echo 'Invalid runtime backup.'; exit 1;
+    }
+    close_orca_windows
+    prepare_companion
+    displaced="$install_root/runtime.backup-before-rollback-$(date +%Y%m%d-%H%M%S)-$$"
+    recovery_backup="$displaced"
+    mv "$install_root/runtime" "$displaced"
+    if ! mv "$backup" "$install_root/runtime"; then
+        mv "$displaced" "$install_root/runtime"
+        exit 1
+    fi
+    restart_companion=1
+    echo "Restored runtime. Displaced runtime retained at: $displaced"
+    ;;
+*) echo "Usage: $0 [build|deploy [-d]|rollback BACKUP]"; exit 1 ;;
+esac

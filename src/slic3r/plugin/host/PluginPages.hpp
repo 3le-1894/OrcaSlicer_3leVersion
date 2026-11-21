@@ -44,6 +44,8 @@ private:
     std::shared_ptr<PagesPluginCapability> m_cap;
     std::shared_ptr<std::atomic<PluginPage*>> m_lifetime;
     bool m_content_loaded{false};
+    bool m_bootstrap_ready{false};
+    bool m_handler_ready{false};
     wxBitmap m_icon;
 };
 

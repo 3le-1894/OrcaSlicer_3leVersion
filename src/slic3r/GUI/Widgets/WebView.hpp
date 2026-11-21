@@ -3,13 +3,18 @@
 
 #include <wx/webview.h>
 #include <wx/event.h>
+#include <functional>
 
 wxDECLARE_EVENT(EVT_WEBVIEW_RECREATED, wxCommandEvent);
 
 class WebView
 {
 public:
-    static wxWebView *CreateWebView(wxWindow *parent, wxString const &url);
+    // Completion runs later on the UI thread for this target's registration.
+    // Destroying the view before its deferred work runs may cancel completion.
+    // true means registration succeeded (not that a document acknowledged a message).
+    static wxWebView *CreateWebView(wxWindow *parent, wxString const &url,
+                                   std::function<void(bool)> handler_ready = {});
 #if wxUSE_WEBVIEW_EDGE
     static bool CheckWebViewRuntime();
     static bool DownloadAndInstallWebViewRuntime();

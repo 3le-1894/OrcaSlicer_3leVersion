@@ -5,6 +5,11 @@
 #include <slic3r/GUI/GUI.hpp>
 #include <slic3r/GUI/GUI_App.hpp>
 #include <slic3r/GUI/Plater.hpp>
+#include <slic3r/GUI/PartPlate.hpp>
+#include <slic3r/GUI/BackgroundSlicingProcess.hpp>
+#include <slic3r/plugin/PluginFsUtils.hpp>
+#include <wx/thread.h>
+#include <nlohmann/json.hpp>
 
 #include <memory>
 #include <stdexcept>
@@ -50,6 +55,37 @@ void host_bindings::register_app(py::module_& host)
         .def("is_project_dirty", &GUI::Plater::is_project_dirty)
         .def("is_presets_dirty", &GUI::Plater::is_presets_dirty)
         .def("inside_snapshot_capture", &GUI::Plater::inside_snapshot_capture);
+
+    host.def("calculator_snapshot", []() {
+        if (!wxIsMainThread())
+            throw std::runtime_error("calculator_snapshot requires the UI thread");
+        auto* plater = current_plater();
+        nlohmann::json out = {{"busy", true}};
+        if (plater->calculator_mutating() || plater->is_background_process_update_scheduled())
+            return json_to_py(out);
+        // UI control cannot start work during this non-yielding native copy.
+        // Never call Python, audit hooks or UI callbacks inside it.
+        plater->background_process().copy_calculator_idle([&](unsigned long long generation) {
+            out = {{"busy", false}, {"epoch", std::to_string(plater->calculator_project_epoch())},
+                   {"model", std::to_string(plater->model().id().id)}, {"generation", std::to_string(generation)},
+                   {"project", GUI::into_u8(plater->get_project_filename())}, {"plates", nlohmann::json::array()}};
+            const auto* bundle = current_preset_bundle();
+            const auto& printer = bundle->printers.get_edited_preset();
+            out["printer"] = printer.name;
+            out["printer_model"] = printer.config.opt_string("printer_model");
+            const auto* vendor = dynamic_cast<const ConfigOptionString*>(printer.config.option("printer_vendor"));
+            out["printer_vendor"] = vendor ? vendor->value : std::string();
+            out["filaments"] = bundle->filament_presets;
+            int index = 0;
+            for (auto* plate : plater->get_partplate_list().get_plate_list()) {
+                const auto* result = plate->get_slice_result();
+                out["plates"].push_back({{"id", std::to_string(plate->id().id)}, {"index", index++},
+                    {"path", result ? result->filename : std::string()},
+                    {"valid", !plate->is_apply_result_invalid() && plate->is_slice_result_valid()}});
+            }
+        });
+        return json_to_py(out);
+    });
 
     host.def("plater", &current_plater, py::return_value_policy::reference);
     host.def("model", []() -> Model& {

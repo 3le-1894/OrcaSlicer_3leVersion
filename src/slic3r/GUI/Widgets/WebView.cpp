@@ -1,4 +1,5 @@
 #include "WebView.hpp"
+#include <wx/weakref.h>
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/Utils/MacDarkMode.hpp"
 
@@ -229,7 +230,21 @@ class FakeWebView : public wxWebView
 wxDEFINE_EVENT(EVT_WEBVIEW_RECREATED, wxCommandEvent);
 
 static std::vector<wxWebView*> g_webviews;
-static std::vector<wxWebView*> g_delay_webviews;
+struct WebViewRegistration {
+    wxWeakRef<wxWebView> view;
+    std::function<void(bool)> complete;
+};
+static std::vector<WebViewRegistration> g_delay_webviews;
+
+static void complete_registration(const WebViewRegistration& target, bool success)
+{
+    if (target.complete) {
+        // Never call a page constructor back synchronously, including on Windows.
+        Slic3r::GUI::wxGetApp().CallAfter([complete = target.complete, success] {
+            complete(success);
+        });
+    }
+}
 
 class WebViewRef : public wxObjectRefData
 {
@@ -251,7 +266,8 @@ static WebViewRef *webview_ref(wxWebView *webView)
     return webView ? static_cast<WebViewRef *>(webView->GetRefData()) : nullptr;
 }
 
-wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
+wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url,
+                                std::function<void(bool)> handler_ready)
 {
 #if wxUSE_WEBVIEW_EDGE
     // Check if a fixed version of edge is present in
@@ -310,32 +326,46 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
         WKWebView * wkWebView = (WKWebView *) webView->GetNativeBackend();
         Slic3r::GUI::WKWebView_setTransparentBackground(wkWebView);
 #endif
-        auto addScriptMessageHandler = [] (wxWebView *webView) {
+        const WebViewRegistration target{wxWeakRef<wxWebView>(webView), std::move(handler_ready)};
+        auto addScriptMessageHandler = [] (const WebViewRegistration& target) {
+            wxWebView* webView = target.view.get();
+            if (!webView) {
+                complete_registration(target, false);
+                return;
+            }
             // Skip if SendAPIKey() already registered "wx"; a duplicate add throws an
             // uncatchable NSException on WKWebView, killing the app at startup.
             WebViewRef *ref = webview_ref(webView);
-            if (ref && ref->m_script_handler_added)
+            if (ref && ref->m_script_handler_added) {
+                complete_registration(target, true);
                 return;
+            }
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": begin to add script message handler for wx.";
             Slic3r::GUI::wxGetApp().set_adding_script_handler(true);
-            if (!webView->AddScriptMessageHandler("wx"))
-                wxLogError("Could not add script message handler");
-            else if (ref)
-                ref->m_script_handler_added = true;
+            const bool added = webView->AddScriptMessageHandler("wx");
             Slic3r::GUI::wxGetApp().set_adding_script_handler(false);
+            // Registration may yield; do not retain ref-data across that call.
+            wxWebView* live = target.view.get();
+            if (added && live) {
+                if (WebViewRef* live_ref = webview_ref(live))
+                    live_ref->m_script_handler_added = true;
+            }
+            complete_registration(target, added && live);
+            if (!added && !target.complete)
+                wxLogError("Could not add script message handler");
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": finished add script message handler for wx.";
         };
 #ifndef __WIN32__
-        webView->CallAfter([webView, addScriptMessageHandler] {
+        webView->CallAfter([target, addScriptMessageHandler] {
 #endif
             if (Slic3r::GUI::wxGetApp().is_adding_script_handler()) {
-                g_delay_webviews.push_back(webView);
+                g_delay_webviews.push_back(target);
             } else {
-                addScriptMessageHandler(webView);
+                addScriptMessageHandler(target);
                 while (!g_delay_webviews.empty()) {
                     auto views = std::move(g_delay_webviews);
-                    for (auto wv : views)
-                        addScriptMessageHandler(wv);
+                    for (const auto& queued : views)
+                        addScriptMessageHandler(queued);
                 }
             }
 #ifndef __WIN32__
@@ -345,6 +375,7 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
     } else {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": failed. Use fake web view.";
         webView = new FakeWebView;
+        complete_registration({wxWeakRef<wxWebView>(webView), std::move(handler_ready)}, false);
     }
     webView->SetRefData(new WebViewRef(webView));
     g_webviews.push_back(webView);

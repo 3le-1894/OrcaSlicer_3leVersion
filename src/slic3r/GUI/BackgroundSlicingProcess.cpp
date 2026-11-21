@@ -1,4 +1,5 @@
 #include "BackgroundSlicingProcess.hpp"
+#include <wx/thread.h>
 #include "GUI_App.hpp"
 #include "GUI.hpp"
 #include "MainFrame.hpp"
@@ -364,7 +365,7 @@ void BackgroundSlicingProcess::thread_proc()
         lck.lock();
         m_state = m_print->canceled() ? STATE_CANCELED : STATE_FINISHED;
         BOOST_LOG_TRIVIAL(debug) << __FUNCTION__
-                                 << boost::format(": process finished, state %1%, print cancel_status %2%") % m_state %
+                                 << boost::format(": process finished, state %1%, print cancel_status %2%") % m_state.load() %
                                         m_print->cancel_status();
         if (m_print->cancel_status() != Print::CANCELED_INTERNAL) {
             // Only post the canceled event, if canceled by user.
@@ -526,6 +527,17 @@ void BackgroundSlicingProcess::join_background_thread()
     }
 }
 
+bool BackgroundSlicingProcess::copy_calculator_idle(const std::function<void(unsigned long long)>& copy)
+{
+    if (!wxIsMainThread() || m_state.load(std::memory_order_acquire) != STATE_IDLE)
+        return false;
+    // No worker can leave IDLE without start() on this same UI thread. No callback may yield.
+    // Existing worker/control stores publish through the atomic state; stop still synchronizes
+    // completion under m_mutex. Do not lock here: the worker uses try_lock to detect cancellation.
+    copy(m_calculator_generation);
+    return true;
+}
+
 bool BackgroundSlicingProcess::start()
 {
     if (m_print->empty()) {
@@ -554,6 +566,7 @@ bool BackgroundSlicingProcess::start()
         return false;
     if (!this->idle())
         throw Slic3r::RuntimeError("Cannot start a background task, the worker thread is not idle.");
+    ++m_calculator_generation;
     m_state = STATE_STARTED;
     m_print->set_cancel_callback([this]() { this->stop_internal(); });
     lck.unlock();

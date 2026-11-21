@@ -73,7 +73,18 @@ PluginPage::PluginPage(wxWindow* parent, std::shared_ptr<PagesPluginCapability> 
     auto* topsizer = new wxBoxSizer(wxVERTICAL);
     SetSizer(topsizer);
 
-    m_browser = WebView::CreateWebView(this, bootstrap_url());
+    const std::shared_ptr<std::atomic<PluginPage*>> lifetime = m_lifetime;
+    m_browser = WebView::CreateWebView(this, bootstrap_url(), [lifetime](bool success) {
+        if (PluginPage* page = lifetime->load(std::memory_order_acquire)) {
+            if (!success) {
+                page->detach_capability();
+                wxLogError("Could not register plugin page message handler");
+                return;
+            }
+            page->m_handler_ready = true;
+            page->load_plugin_content();
+        }
+    });
     if (m_browser == nullptr) {
         wxLogError("Could not initialize plugin page web view");
         return;
@@ -88,7 +99,6 @@ PluginPage::PluginPage(wxWindow* parent, std::shared_ptr<PagesPluginCapability> 
     m_browser->AddUserScript(wxString::FromUTF8(GUI::WebViewHostDialog::plugin_defaults_user_script()));
     m_browser->AddUserScript(PLUGIN_PAGE_BRIDGE_JS);
 
-    const std::shared_ptr<std::atomic<PluginPage*>> lifetime = m_lifetime;
     m_cap->set_message_sender([lifetime](const std::string& message) {
         if (wxTheApp == nullptr)
             return;
@@ -131,13 +141,14 @@ wxString PluginPage::bootstrap_url() const
 
 void PluginPage::on_bootstrap_event(wxWebViewEvent& event)
 {
+    m_bootstrap_ready = true;
     load_plugin_content();
     event.Skip();
 }
 
 void PluginPage::load_plugin_content()
 {
-    if (m_content_loaded || m_browser == nullptr || m_cap == nullptr)
+    if (m_content_loaded || !m_bootstrap_ready || !m_handler_ready || m_browser == nullptr || m_cap == nullptr)
         return;
 
     m_content_loaded = true;
