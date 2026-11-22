@@ -1,4 +1,5 @@
 #include "MainFrame.hpp"
+#include <limits>
 
 #include <wx/panel.h>
 #include <wx/notebook.h>
@@ -2818,7 +2819,9 @@ void MainFrame::calculate_mvs_safe_speeds()
 
         const auto* speed_opt = print_config.option<ConfigOptionFloatsNullable>(limit.speed_key);
         const double current_speed = speed_opt != nullptr && !speed_opt->values.empty() ? speed_opt->get_at(0) : 0.0;
-        const double calculated_speed = max_volumetric_speed / (line_width * layer_height);
+        const double mvs_speed = max_volumetric_speed / (line_width * layer_height);
+        // Avoid flooring an exact integer one lower due to floating-point arithmetic.
+        const double calculated_speed = std::floor(mvs_speed + 4.0 * std::numeric_limits<double>::epsilon() * mvs_speed);
         if (current_speed != calculated_speed) {
             change_opt_value(print_config, limit.speed_key, calculated_speed);
             changes += wxString::Format("%s: %.15g -> %.15g mm/s\n",
