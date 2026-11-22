@@ -2793,9 +2793,6 @@ void MainFrame::calculate_mvs_safe_speeds()
         return;
     }
 
-    static constexpr double mvs_safe_speed_factor = 0.80;
-    static constexpr double mvs_speed_rounding = 5.0;
-
     struct SpeedLimit {
         const char* speed_key;
         const char* line_width_key;
@@ -2821,14 +2818,10 @@ void MainFrame::calculate_mvs_safe_speeds()
 
         const auto* speed_opt = print_config.option<ConfigOptionFloatsNullable>(limit.speed_key);
         const double current_speed = speed_opt != nullptr && !speed_opt->values.empty() ? speed_opt->get_at(0) : 0.0;
-        if (current_speed <= 0.0)
-            continue;
-
-        const double raw_calculated_speed = std::max(1.0, std::floor((max_volumetric_speed / (line_width * layer_height)) * mvs_safe_speed_factor + 0.5));
-        const double calculated_speed = std::max(mvs_speed_rounding, std::floor(raw_calculated_speed / mvs_speed_rounding) * mvs_speed_rounding);
-        if (current_speed > calculated_speed) {
+        const double calculated_speed = max_volumetric_speed / (line_width * layer_height);
+        if (current_speed != calculated_speed) {
             change_opt_value(print_config, limit.speed_key, calculated_speed);
-            changes += wxString::Format("%s: %.0f -> %.0f mm/s\n",
+            changes += wxString::Format("%s: %.15g -> %.15g mm/s\n",
                 from_u8(limit.label), current_speed, calculated_speed);
             ++changed;
         }
@@ -2836,7 +2829,7 @@ void MainFrame::calculate_mvs_safe_speeds()
 
     if (changed == 0) {
         MessageDialog msg(this,
-            _L("No speed changes were needed. The current absolute speed values are already at or below the calculated MVS-safe limits."),
+            _L("No speed changes were needed. All listed speed values already match the calculated MVS speeds."),
             _L("MVS safe speeds"), wxOK | wxICON_INFORMATION);
         msg.ShowModal();
         return;
